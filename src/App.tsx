@@ -112,9 +112,16 @@ import { useWorkspaceHome } from "./features/workspaces/hooks/useWorkspaceHome";
 import { useWorkspaceAgentMd } from "./features/workspaces/hooks/useWorkspaceAgentMd";
 import { useThreadCodexParams } from "./features/threads/hooks/useThreadCodexParams";
 import { makeThreadCodexParamsKey } from "./features/threads/utils/threadStorage";
+import {
+  buildThreadCodexSeedPatch,
+  createPendingThreadSeed,
+  resolveThreadCodexState,
+  type PendingNewThreadSeed,
+} from "./features/threads/utils/threadCodexParamsSeed";
 import { isMobilePlatform } from "./utils/platformPaths";
 import type {
   AccessMode,
+  AppMention,
   ComposerEditorSettings,
   WorkspaceInfo,
 } from "./types";
@@ -262,11 +269,7 @@ function MainApp() {
   const activeThreadIdRef = useRef<string | null>(null);
   // When sending the first message from the "no thread" composer, snapshot the
   // collaboration mode so it can be applied to the created thread.
-  const pendingNewThreadSeedRef = useRef<{
-    workspaceId: string;
-    collaborationModeId: string | null;
-    accessMode: AccessMode;
-  } | null>(null);
+  const pendingNewThreadSeedRef = useRef<PendingNewThreadSeed | null>(null);
   const {
     sidebarWidth,
     rightPanelWidth,
@@ -417,6 +420,7 @@ function MainApp() {
     activeWorkspace,
     gitDiffPreloadEnabled: appSettings.preloadGitDiffs,
     gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
+    splitChatDiffView: appSettings.splitChatDiffView,
     isCompact,
     isTablet,
     activeTab,
@@ -614,11 +618,6 @@ function MainApp() {
     onFocusComposer: () => composerInputRef.current?.focus(),
   });
   const { skills } = useSkills({ activeWorkspace, onDebug: addDebugEntry });
-  const { apps } = useApps({
-    activeWorkspace,
-    enabled: appSettings.experimentalAppsEnabled,
-    onDebug: addDebugEntry,
-  });
   const {
     prompts,
     createPrompt,
@@ -817,6 +816,12 @@ function MainApp() {
     onMessageActivity: queueGitStatusRefresh,
     threadSortKey: threadListSortKey,
   });
+  const { apps } = useApps({
+    activeWorkspace,
+    activeThreadId,
+    enabled: appSettings.experimentalAppsEnabled,
+    onDebug: addDebugEntry,
+  });
 
   useLayoutEffect(() => {
     const workspaceId = activeWorkspaceId ?? null;
@@ -827,42 +832,22 @@ function MainApp() {
       return;
     }
 
-    const scopeKey = threadId
-      ? makeThreadCodexParamsKey(workspaceId, threadId)
-      : `${workspaceId}:__no_thread__`;
-
     const stored = threadId ? getThreadCodexParams(workspaceId, threadId) : null;
+    const resolved = resolveThreadCodexState({
+      workspaceId,
+      threadId,
+      defaultAccessMode: appSettings.defaultAccessMode,
+      lastComposerModelId: appSettings.lastComposerModelId,
+      lastComposerReasoningEffort: appSettings.lastComposerReasoningEffort,
+      stored,
+      pendingSeed: pendingNewThreadSeedRef.current,
+    });
 
-    setThreadCodexSelectionKey(scopeKey);
-
-    if (threadId) {
-      const pendingSeed = pendingNewThreadSeedRef.current;
-      const pendingAccessMode =
-        pendingSeed && pendingSeed.workspaceId === workspaceId
-          ? pendingSeed.accessMode
-          : null;
-      setAccessMode(stored?.accessMode ?? pendingAccessMode ?? appSettings.defaultAccessMode);
-
-      // Thread-scoped defaults: prefer stored overrides, but fall back to the global
-      // "last composer" preferences for newly created threads.
-      setPreferredModelId(stored?.modelId ?? appSettings.lastComposerModelId ?? null);
-      setPreferredEffort(
-        stored?.effort ?? appSettings.lastComposerReasoningEffort ?? null,
-      );
-      const pendingCollabModeId =
-        pendingSeed && pendingSeed.workspaceId === workspaceId
-          ? pendingSeed.collaborationModeId
-          : null;
-      setPreferredCollabModeId(stored?.collaborationModeId ?? pendingCollabModeId ?? null);
-      return;
-    }
-
-    setAccessMode(appSettings.defaultAccessMode);
-
-    // No active thread: use global "last composer" preferences.
-    setPreferredModelId(appSettings.lastComposerModelId);
-    setPreferredEffort(appSettings.lastComposerReasoningEffort);
-    setPreferredCollabModeId(null);
+    setThreadCodexSelectionKey(resolved.scopeKey);
+    setAccessMode(resolved.accessMode);
+    setPreferredModelId(resolved.preferredModelId);
+    setPreferredEffort(resolved.preferredEffort);
+    setPreferredCollabModeId(resolved.preferredCollabModeId);
   }, [
     activeThreadId,
     activeWorkspaceId,
@@ -898,19 +883,18 @@ function MainApp() {
 
     seededThreadParamsRef.current.add(key);
     const pendingSeed = pendingNewThreadSeedRef.current;
-    const pendingCollabModeId =
-      pendingSeed && pendingSeed.workspaceId === workspaceId
-        ? pendingSeed.collaborationModeId
-        : null;
-    patchThreadCodexParams(workspaceId, threadId, {
-      modelId: selectedModelId,
-      effort: resolvedEffort,
-      accessMode:
-        pendingSeed && pendingSeed.workspaceId === workspaceId
-          ? pendingSeed.accessMode
-          : accessMode,
-      collaborationModeId: pendingCollabModeId ?? selectedCollaborationModeId,
-    });
+    patchThreadCodexParams(
+      workspaceId,
+      threadId,
+      buildThreadCodexSeedPatch({
+        workspaceId,
+        selectedModelId,
+        resolvedEffort,
+        accessMode,
+        selectedCollaborationModeId,
+        pendingSeed,
+      }),
+    );
     if (pendingSeed?.workspaceId === workspaceId) {
       pendingNewThreadSeedRef.current = null;
     }
@@ -968,9 +952,6 @@ function MainApp() {
     activeThreadId,
   });
   const { getThreadRows } = useThreadRows(threadParentById);
-  useEffect(() => {
-    activeThreadIdRef.current = activeThreadId ?? null;
-  }, [activeThreadId]);
 
   const { recordPendingThreadLink } = useSystemNotificationThreadLinks({
     hasLoadedWorkspaces: hasLoaded,
@@ -1775,30 +1756,39 @@ function MainApp() {
   });
 
   const rememberPendingNewThreadSeed = useCallback(() => {
-    // Only relevant when the composer is starting a brand-new thread.
-    if (activeThreadId || !activeWorkspaceId) {
-      return;
-    }
-    pendingNewThreadSeedRef.current = {
-      workspaceId: activeWorkspaceId,
-      collaborationModeId: selectedCollaborationModeId,
+    pendingNewThreadSeedRef.current = createPendingThreadSeed({
+      activeThreadId: activeThreadId ?? null,
+      activeWorkspaceId: activeWorkspaceId ?? null,
+      selectedCollaborationModeId,
       accessMode,
-    };
+    });
   }, [accessMode, activeThreadId, activeWorkspaceId, selectedCollaborationModeId]);
 
   const handleComposerSendWithDraftStart = useCallback(
-    (text: string, images: string[]) => {
+    (text: string, images: string[], appMentions?: AppMention[]) => {
       rememberPendingNewThreadSeed();
-      return runWithDraftStart(() => handleComposerSend(text, images));
+      return runWithDraftStart(() => (
+        appMentions && appMentions.length > 0
+          ? handleComposerSend(text, images, appMentions)
+          : handleComposerSend(text, images)
+      ));
     },
     [handleComposerSend, rememberPendingNewThreadSeed, runWithDraftStart],
   );
   const handleComposerQueueWithDraftStart = useCallback(
-    (text: string, images: string[]) => {
+    (text: string, images: string[], appMentions?: AppMention[]) => {
       // Queueing without an active thread would no-op; bootstrap through send so user input is not lost.
       const runner = activeThreadId
-        ? () => handleComposerQueue(text, images)
-        : () => handleComposerSend(text, images);
+        ? () => (
+          appMentions && appMentions.length > 0
+            ? handleComposerQueue(text, images, appMentions)
+            : handleComposerQueue(text, images)
+        )
+        : () => (
+          appMentions && appMentions.length > 0
+            ? handleComposerSend(text, images, appMentions)
+            : handleComposerSend(text, images)
+        );
       if (!activeThreadId) {
         rememberPendingNewThreadSeed();
       }
@@ -2547,6 +2537,7 @@ function MainApp() {
         tabletTab={tabletTab}
         centerMode={centerMode}
         preloadGitDiffs={appSettings.preloadGitDiffs}
+        splitChatDiffView={appSettings.splitChatDiffView}
         hasActivePlan={hasActivePlan}
         activeWorkspace={Boolean(activeWorkspace)}
         sidebarNode={sidebarNode}
