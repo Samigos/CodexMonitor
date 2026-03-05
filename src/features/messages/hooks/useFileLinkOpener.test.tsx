@@ -69,6 +69,66 @@ describe("useFileLinkOpener", () => {
     );
   });
 
+  it("keeps unmatched /workspace/<workspace-name>/... links absolute", async () => {
+    const workspacePath = "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor";
+    const openWorkspaceInMock = vi.mocked(openWorkspaceIn);
+    const { result } = renderHook(() => useFileLinkOpener(workspacePath, [], ""));
+
+    await act(async () => {
+      await result.current.openFileLink("/workspace/AnotherRepo/README.md");
+    });
+
+    expect(openWorkspaceInMock).toHaveBeenCalledWith(
+      "/workspace/AnotherRepo/README.md",
+      expect.objectContaining({ appName: "Visual Studio Code", args: [] }),
+    );
+  });
+
+  it("does not match the active workspace name later in a /workspace path", async () => {
+    const workspacePath = "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor";
+    const openWorkspaceInMock = vi.mocked(openWorkspaceIn);
+    const { result } = renderHook(() => useFileLinkOpener(workspacePath, [], ""));
+
+    await act(async () => {
+      await result.current.openFileLink("/workspace/AnotherRepo/CodexMonitor/README.md");
+    });
+
+    expect(openWorkspaceInMock).toHaveBeenCalledWith(
+      "/workspace/AnotherRepo/CodexMonitor/README.md",
+      expect.objectContaining({ appName: "Visual Studio Code", args: [] }),
+    );
+  });
+
+  it("still maps hidden root directories inside the active workspace", async () => {
+    const workspacePath = "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor";
+    const openWorkspaceInMock = vi.mocked(openWorkspaceIn);
+    const { result } = renderHook(() => useFileLinkOpener(workspacePath, [], ""));
+
+    await act(async () => {
+      await result.current.openFileLink("/workspace/.github/workflows");
+    });
+
+    expect(openWorkspaceInMock).toHaveBeenCalledWith(
+      "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor/.github/workflows",
+      expect.objectContaining({ appName: "Visual Studio Code", args: [] }),
+    );
+  });
+
+  it("still maps root files inside the active workspace", async () => {
+    const workspacePath = "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor";
+    const openWorkspaceInMock = vi.mocked(openWorkspaceIn);
+    const { result } = renderHook(() => useFileLinkOpener(workspacePath, [], ""));
+
+    await act(async () => {
+      await result.current.openFileLink("/workspace/package.json");
+    });
+
+    expect(openWorkspaceInMock).toHaveBeenCalledWith(
+      "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor/package.json",
+      expect.objectContaining({ appName: "Visual Studio Code", args: [] }),
+    );
+  });
+
   it("maps nested /workspaces/.../<workspace-name>/... paths to the active workspace path", async () => {
     const workspacePath = "/Users/sotiriskaniras/Documents/Development/Forks/CodexMonitor";
     const openWorkspaceInMock = vi.mocked(openWorkspaceIn);

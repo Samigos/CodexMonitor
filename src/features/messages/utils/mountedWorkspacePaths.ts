@@ -18,6 +18,39 @@ function pathBaseName(path: string) {
     .pop() ?? "";
 }
 
+const DOTLESS_WORKSPACE_FILE_NAMES = new Set([
+  "LICENSE",
+  "README",
+  "CHANGELOG",
+  "NOTICE",
+  "COPYING",
+  "Makefile",
+  "Dockerfile",
+  "Procfile",
+  "Gemfile",
+]);
+
+function hasLikelyExplicitWorkspaceSegment(
+  segment: string,
+  hasNestedPath: boolean,
+) {
+  if (!segment || segment.startsWith(".")) {
+    return false;
+  }
+  // Single-segment dotted mounts are usually workspace-root files like package.json.
+  if (!hasNestedPath && segment.includes(".")) {
+    return false;
+  }
+  if (DOTLESS_WORKSPACE_FILE_NAMES.has(segment)) {
+    return false;
+  }
+  return (
+    /[A-Z]/.test(segment) ||
+    /[_-]/.test(segment) ||
+    (hasNestedPath && segment.includes("."))
+  );
+}
+
 export function resolveMountedWorkspacePath(
   path: string,
   workspacePath?: string | null,
@@ -34,36 +67,56 @@ export function resolveMountedWorkspacePath(
     return null;
   }
 
-  const resolveFromSegments = (segments: string[], allowDirectRelative: boolean) => {
+  const resolveFromWorkspaceSegments = (
+    segments: string[],
+    fallbackAbsolutePath?: string,
+  ) => {
     if (segments.length === 0) {
       return trimTrailingSeparators(trimmedWorkspace);
     }
-    const workspaceIndex = segments.findIndex((segment) => segment === workspaceName);
-    if (workspaceIndex >= 0) {
-      const relativePath = segments.slice(workspaceIndex + 1).join("/");
+    const [firstSegment = "", ...relativeSegments] = segments;
+    if (firstSegment === workspaceName) {
+      const relativePath = relativeSegments.join("/");
       return relativePath
         ? joinWorkspacePath(trimmedWorkspace, relativePath)
         : trimTrailingSeparators(trimmedWorkspace);
     }
-    if (allowDirectRelative) {
-      return joinWorkspacePath(trimmedWorkspace, segments.join("/"));
+    if (
+      fallbackAbsolutePath &&
+      hasLikelyExplicitWorkspaceSegment(firstSegment, relativeSegments.length > 0)
+    ) {
+      // Preserve absolute sibling-workspace mounts instead of rebasing them locally.
+      return fallbackAbsolutePath;
     }
-    return null;
+    return joinWorkspacePath(trimmedWorkspace, segments.join("/"));
+  };
+
+  const resolveFromWorkspacesSegments = (segments: string[]) => {
+    if (segments.length === 0) {
+      return trimTrailingSeparators(trimmedWorkspace);
+    }
+    const workspaceIndex = segments.findIndex((segment) => segment === workspaceName);
+    if (workspaceIndex < 0) {
+      return null;
+    }
+    const relativePath = segments.slice(workspaceIndex + 1).join("/");
+    return relativePath
+      ? joinWorkspacePath(trimmedWorkspace, relativePath)
+      : trimTrailingSeparators(trimmedWorkspace);
   };
 
   if (normalizedPath.startsWith(WORKSPACE_MOUNT_PREFIX)) {
-    return resolveFromSegments(
+    return resolveFromWorkspaceSegments(
       normalizedPath.slice(WORKSPACE_MOUNT_PREFIX.length).split("/").filter(Boolean),
-      true,
+      normalizedPath,
     );
   }
   if (normalizedPath.startsWith(WORKSPACES_MOUNT_PREFIX)) {
-    return resolveFromSegments(
+    return resolveFromWorkspacesSegments(
       normalizedPath
         .slice(WORKSPACES_MOUNT_PREFIX.length)
         .split("/")
         .filter(Boolean),
-      false,
     );
   }
   return null;
