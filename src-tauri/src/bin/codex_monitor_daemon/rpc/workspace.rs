@@ -181,6 +181,10 @@ pub(super) async fn try_handle(
             let request = parse_request_or_err!(params, workspace_rpc::WorkspaceIdRequest);
             Some(serialize_result(state.list_workspace_files(request.workspace_id)).await)
         }
+        "list_workspace_symbols" => {
+            let request = parse_request_or_err!(params, workspace_rpc::WorkspaceIdRequest);
+            Some(serialize_result(state.list_workspace_symbols(request.workspace_id)).await)
+        }
         "read_workspace_file" => {
             let request = parse_request_or_err!(params, workspace_rpc::ReadWorkspaceFileRequest);
             Some(

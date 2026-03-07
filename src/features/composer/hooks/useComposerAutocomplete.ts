@@ -5,9 +5,10 @@ export type AutocompleteItem = {
   label: string;
   description?: string;
   insertText?: string;
+  searchText?: string;
   hint?: string;
   cursorOffset?: number;
-  group?: "Files" | "Skills" | "Apps" | "Slash" | "Prompts";
+  group?: "Files" | "Functions" | "Skills" | "Apps" | "Slash" | "Prompts";
   mentionPath?: string;
 };
 
@@ -99,7 +100,7 @@ function isSubsequence(query: string, target: string) {
   return q === query.length;
 }
 
-function scoreMatch(query: string, label: string) {
+function scoreFileMatch(query: string, label: string) {
   if (!query) {
     return 0;
   }
@@ -148,6 +149,70 @@ function scoreMatch(query: string, label: string) {
   return 0;
 }
 
+function scoreTextMatch(query: string, target: string) {
+  if (!query || !target) {
+    return 0;
+  }
+  const normalizedTarget = target.toLowerCase();
+  if (normalizedTarget === query) {
+    return 120;
+  }
+  if (normalizedTarget.startsWith(query)) {
+    return 100;
+  }
+  if (normalizedTarget.includes(query)) {
+    return 80;
+  }
+  if (isSubsequence(query, normalizedTarget)) {
+    return 55;
+  }
+  return 0;
+}
+
+function scoreFunctionMatch(query: string, item: AutocompleteItem) {
+  const symbol = item.label.toLowerCase();
+  const path = (item.description ?? "").replace(/\\/g, "/").toLowerCase();
+  const combined = (item.searchText ?? `${path}#${symbol}`).toLowerCase();
+
+  return Math.max(
+    scoreTextMatch(query, symbol) + 25,
+    scoreTextMatch(query, combined) + 10,
+    scoreTextMatch(query, path),
+  );
+}
+
+function scoreItem(query: string, item: AutocompleteItem) {
+  if (item.group === "Files") {
+    return scoreFileMatch(query, item.label);
+  }
+  if (item.group === "Functions") {
+    return scoreFunctionMatch(query, item);
+  }
+  return Math.max(
+    scoreTextMatch(query, item.label),
+    scoreTextMatch(query, item.searchText ?? ""),
+  );
+}
+
+function groupPriority(group: AutocompleteItem["group"]) {
+  switch (group) {
+    case "Functions":
+      return 0;
+    case "Files":
+      return 1;
+    case "Skills":
+      return 0;
+    case "Apps":
+      return 1;
+    case "Slash":
+      return 0;
+    case "Prompts":
+      return 1;
+    default:
+      return 99;
+  }
+}
+
 function rankItems(items: AutocompleteItem[], query: string) {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
@@ -156,12 +221,19 @@ function rankItems(items: AutocompleteItem[], query: string) {
   const ranked = items
     .map((item) => ({
       item,
-      score: scoreMatch(normalized, item.label),
+      score: scoreItem(normalized, item),
     }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => {
+      const groupDelta = groupPriority(a.item.group) - groupPriority(b.item.group);
+      if (groupDelta !== 0) {
+        return groupDelta;
+      }
       if (a.score !== b.score) {
         return b.score - a.score;
+      }
+      if (a.item.label.length !== b.item.label.length) {
+        return a.item.label.length - b.item.label.length;
       }
       return a.item.label.localeCompare(b.item.label);
     });

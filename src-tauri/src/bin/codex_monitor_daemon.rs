@@ -647,6 +647,13 @@ impl DaemonState {
         .await
     }
 
+    async fn list_workspace_symbols(
+        &self,
+        workspace_id: String,
+    ) -> Result<Vec<workspaces_core::WorkspaceCallableSymbol>, String> {
+        workspaces_core::list_workspace_symbols_core(&self.workspaces, &workspace_id).await
+    }
+
     async fn read_workspace_file(
         &self,
         workspace_id: String,
@@ -757,8 +764,7 @@ impl DaemonState {
         limit: Option<u32>,
         sort_key: Option<String>,
     ) -> Result<Value, String> {
-        codex_core::list_threads_core(&self.sessions, workspace_id, cursor, limit, sort_key)
-            .await
+        codex_core::list_threads_core(&self.sessions, workspace_id, cursor, limit, sort_key).await
     }
 
     async fn list_mcp_server_status(

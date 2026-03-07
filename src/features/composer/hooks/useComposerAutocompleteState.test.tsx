@@ -25,6 +25,7 @@ describe("useComposerAutocompleteState file mentions", () => {
         apps: [],
         prompts: [],
         files,
+        callables: [],
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
@@ -57,6 +58,7 @@ describe("useComposerAutocompleteState file mentions", () => {
         apps: [],
         prompts: [],
         files,
+        callables: [],
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
@@ -90,6 +92,7 @@ describe("useComposerAutocompleteState slash commands", () => {
         apps: [],
         prompts: [],
         files: [],
+        callables: [],
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
@@ -140,6 +143,7 @@ describe("useComposerAutocompleteState slash commands", () => {
         apps: [],
         prompts: [],
         files: [],
+        callables: [],
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
@@ -192,6 +196,7 @@ describe("useComposerAutocompleteState $ completions", () => {
         ],
         prompts: [],
         files: [],
+        callables: [],
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
@@ -208,5 +213,92 @@ describe("useComposerAutocompleteState $ completions", () => {
     expect(ids).not.toContain("app:not-ready");
     expect(appSuggestion?.insertText).toBe("calendar-app");
     expect(appSuggestion?.mentionPath).toBe("app://connector_calendar");
+  });
+
+  it("shows grouped function suggestions for specific @ queries", () => {
+    const text = "@use";
+    const selectionStart = text.length;
+    const textareaRef = createRef<HTMLTextAreaElement>();
+    textareaRef.current = {
+      focus: vi.fn(),
+      setSelectionRange: vi.fn(),
+    } as unknown as HTMLTextAreaElement;
+
+    const { result } = renderHook(() =>
+      useComposerAutocompleteState({
+        text,
+        selectionStart,
+        disabled: false,
+        appsEnabled: true,
+        skills: [],
+        apps: [],
+        prompts: [],
+        files: ["src/hooks/useTheme.ts"],
+        callables: [
+          {
+            path: "src/hooks/useComposerAutocompleteState.ts",
+            symbol: "useComposerAutocompleteState",
+            kind: "hook",
+            language: "typescript",
+          },
+          {
+            path: "src/hooks/useTheme.ts",
+            symbol: "useTheme",
+            kind: "hook",
+            language: "typescript",
+          },
+        ],
+        textareaRef,
+        setText: vi.fn(),
+        setSelectionStart: vi.fn(),
+      }),
+    );
+
+    expect(result.current.autocompleteMatches.map((item) => item.group)).toEqual([
+      "Functions",
+      "Functions",
+      "Files",
+    ]);
+    expect(result.current.autocompleteMatches[0]).toMatchObject({
+      label: "useTheme",
+      description: "src/hooks/useTheme.ts",
+      insertText: "src/hooks/useTheme.ts#useTheme",
+    });
+  });
+
+  it("does not show function suggestions on an empty @ query", () => {
+    const text = "@";
+    const selectionStart = text.length;
+    const textareaRef = createRef<HTMLTextAreaElement>();
+    textareaRef.current = {
+      focus: vi.fn(),
+      setSelectionRange: vi.fn(),
+    } as unknown as HTMLTextAreaElement;
+
+    const { result } = renderHook(() =>
+      useComposerAutocompleteState({
+        text,
+        selectionStart,
+        disabled: false,
+        appsEnabled: true,
+        skills: [],
+        apps: [],
+        prompts: [],
+        files: ["src/main.tsx"],
+        callables: [
+          {
+            path: "src/main.tsx",
+            symbol: "App",
+            kind: "component",
+            language: "typescript",
+          },
+        ],
+        textareaRef,
+        setText: vi.fn(),
+        setSelectionStart: vi.fn(),
+      }),
+    );
+
+    expect(result.current.autocompleteMatches.map((item) => item.group)).toEqual(["Files"]);
   });
 });

@@ -18,6 +18,7 @@ import type {
   FollowUpMessageBehavior,
   QueuedMessage,
   ThreadTokenUsage,
+  WorkspaceCallableSymbol,
 } from "../../../types";
 import type {
   ReviewPromptState,
@@ -81,6 +82,7 @@ type ComposerProps = {
   apps: AppOption[];
   prompts: CustomPromptOption[];
   files: string[];
+  callables: WorkspaceCallableSymbol[];
   contextUsage?: ThreadTokenUsage | null;
   queuedMessages?: QueuedMessage[];
   queuePausedReason?: string | null;
@@ -139,7 +141,7 @@ type ComposerProps = {
   onReviewPromptConfirmCommit?: () => Promise<void>;
   onReviewPromptUpdateCustomInstructions?: (value: string) => void;
   onReviewPromptConfirmCustom?: () => Promise<void>;
-  onFileAutocompleteActiveChange?: (active: boolean) => void;
+  onProjectAutocompleteActiveChange?: (active: boolean) => void;
   contextActions?: {
     id: string;
     label: string;
@@ -190,6 +192,7 @@ export const Composer = memo(function Composer({
   apps,
   prompts,
   files,
+  callables,
   contextUsage = null,
   queuedMessages = [],
   queuePausedReason = null,
@@ -242,7 +245,7 @@ export const Composer = memo(function Composer({
   onReviewPromptConfirmCommit,
   onReviewPromptUpdateCustomInstructions,
   onReviewPromptConfirmCustom,
-  onFileAutocompleteActiveChange,
+  onProjectAutocompleteActiveChange,
   contextActions = [],
 }: ComposerProps) {
   const [text, setText] = useState(draftText);
@@ -316,7 +319,7 @@ export const Composer = memo(function Composer({
     handleInputKeyDown,
     handleTextChange,
     handleSelectionChange,
-    fileTriggerActive,
+    projectTriggerActive,
   } = useComposerAutocompleteState({
     text,
     selectionStart,
@@ -326,6 +329,7 @@ export const Composer = memo(function Composer({
     apps,
     prompts,
     files,
+    callables,
     textareaRef,
     setText: setComposerText,
     setSelectionStart,
@@ -357,8 +361,8 @@ export const Composer = memo(function Composer({
     },
   });
   useEffect(() => {
-    onFileAutocompleteActiveChange?.(fileTriggerActive);
-  }, [fileTriggerActive, onFileAutocompleteActiveChange]);
+    onProjectAutocompleteActiveChange?.(projectTriggerActive);
+  }, [onProjectAutocompleteActiveChange, projectTriggerActive]);
   const reviewPromptOpen = Boolean(reviewPrompt);
   const suggestionsOpen = reviewPromptOpen || isAutocompleteOpen;
   const suggestions = reviewPromptOpen ? [] : autocompleteMatches;

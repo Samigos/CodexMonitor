@@ -48,6 +48,7 @@ function ComposerHarness({ initialText = "", editorSettings }: HarnessProps) {
       apps={[]}
       prompts={[]}
       files={[]}
+      callables={[]}
       draftText={draftText}
       onDraftChange={setDraftText}
       textareaRef={textareaRef}

@@ -1377,7 +1377,12 @@ function MainApp() {
   const showComposer = (!isCompact
     ? centerMode === "chat" || centerMode === "diff"
     : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
-  const { files, isLoading: isFilesLoading, setFileAutocompleteActive } =
+  const {
+    files,
+    callables,
+    isLoading: isFilesLoading,
+    setProjectAutocompleteActive,
+  } =
     useWorkspaceFileListing({
       activeWorkspace,
       activeWorkspaceId,
@@ -2382,7 +2387,7 @@ function MainApp() {
     onSend: handleComposerSendWithDraftStart,
     onStop: interruptTurn,
     canStop: canInterrupt,
-    onFileAutocompleteActiveChange: setFileAutocompleteActive,
+    onProjectAutocompleteActiveChange: setProjectAutocompleteActive,
     isReviewing,
     isProcessing,
     steerAvailable,
@@ -2450,6 +2455,7 @@ function MainApp() {
     apps,
     prompts,
     files,
+    callables,
     onInsertComposerText: handleInsertComposerText,
     canInsertComposerText,
     textareaRef: composerInputRef,
@@ -2561,7 +2567,8 @@ function MainApp() {
       apps={apps}
       prompts={prompts}
       files={files}
-      onFileAutocompleteActiveChange={setFileAutocompleteActive}
+      callables={callables}
+      onProjectAutocompleteActiveChange={setProjectAutocompleteActive}
       dictationEnabled={appSettings.dictationEnabled && dictationReady}
       dictationState={dictationState}
       dictationLevel={dictationLevel}

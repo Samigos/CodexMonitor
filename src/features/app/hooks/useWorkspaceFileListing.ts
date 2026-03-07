@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import type { DebugEntry, WorkspaceInfo } from "../../../types";
+import type { DebugEntry, WorkspaceCallableSymbol, WorkspaceInfo } from "../../../types";
 import { useWorkspaceFiles } from "../../workspaces/hooks/useWorkspaceFiles";
+import { useWorkspaceCallableSymbols } from "../../workspaces/hooks/useWorkspaceCallableSymbols";
 
 type FilePanelMode = "git" | "files" | "prompts";
 type TabKey = "home" | "projects" | "codex" | "git" | "log";
@@ -21,8 +22,9 @@ type UseWorkspaceFileListingArgs = {
 
 type UseWorkspaceFileListingResult = {
   files: string[];
+  callables: WorkspaceCallableSymbol[];
   isLoading: boolean;
-  setFileAutocompleteActive: (active: boolean) => void;
+  setProjectAutocompleteActive: (active: boolean) => void;
 };
 
 export function useWorkspaceFileListing({
@@ -37,24 +39,25 @@ export function useWorkspaceFileListing({
   hasComposerSurface,
   onDebug,
 }: UseWorkspaceFileListingArgs): UseWorkspaceFileListingResult {
-  const [fileAutocompleteActive, setFileAutocompleteActive] = useState(false);
+  const [projectAutocompleteActive, setProjectAutocompleteActive] = useState(false);
 
   const compactTab = isTablet ? tabletTab : activeTab;
   const filePanelVisible =
     filePanelMode === "files" &&
     (isCompact ? compactTab === "git" : !rightPanelCollapsed);
   const shouldFetchFiles =
-    Boolean(activeWorkspace) && (filePanelMode === "files" || fileAutocompleteActive);
+    Boolean(activeWorkspace) && (filePanelMode === "files" || projectAutocompleteActive);
+  const shouldFetchCallables = Boolean(activeWorkspace) && projectAutocompleteActive;
 
   useEffect(() => {
     if (!activeWorkspaceId) {
-      setFileAutocompleteActive(false);
+      setProjectAutocompleteActive(false);
     }
   }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (!hasComposerSurface) {
-      setFileAutocompleteActive(false);
+      setProjectAutocompleteActive(false);
     }
   }, [hasComposerSurface]);
 
@@ -65,5 +68,17 @@ export function useWorkspaceFileListing({
     pollingEnabled: filePanelVisible,
   });
 
-  return { files, isLoading, setFileAutocompleteActive };
+  const { callables, isLoading: isCallablesLoading } = useWorkspaceCallableSymbols({
+    activeWorkspace,
+    onDebug,
+    enabled: shouldFetchCallables,
+    pollingEnabled: projectAutocompleteActive,
+  });
+
+  return {
+    files,
+    callables,
+    isLoading: isLoading || isCallablesLoading,
+    setProjectAutocompleteActive,
+  };
 }

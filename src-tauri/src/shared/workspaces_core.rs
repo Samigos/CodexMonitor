@@ -4,6 +4,7 @@ mod git_orchestration;
 mod helpers;
 mod io;
 mod runtime_codex_args;
+mod symbols;
 mod worktree;
 
 pub(crate) use connect::connect_workspace_core;
@@ -20,6 +21,7 @@ pub(crate) use io::{
 pub(crate) use runtime_codex_args::{
     set_workspace_runtime_codex_args_core, WorkspaceRuntimeCodexArgsResult,
 };
+pub(crate) use symbols::{list_workspace_symbols_core, WorkspaceCallableSymbol};
 pub(crate) use worktree::{
     add_worktree_core, remove_worktree_core, rename_worktree_core, rename_worktree_upstream_core,
     worktree_setup_mark_ran_core, worktree_setup_status_core,

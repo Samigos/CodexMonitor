@@ -1,7 +1,11 @@
 import { useCallback, useMemo } from "react";
 import type { AutocompleteItem } from "./useComposerAutocomplete";
 import { useComposerAutocomplete } from "./useComposerAutocomplete";
-import type { AppOption, CustomPromptOption } from "../../../types";
+import type {
+  AppOption,
+  CustomPromptOption,
+  WorkspaceCallableSymbol,
+} from "../../../types";
 import { connectorMentionSlug } from "../../apps/utils/appMentions";
 import {
   buildPromptInsertText,
@@ -21,6 +25,7 @@ type UseComposerAutocompleteStateArgs = {
   apps: AppOption[];
   prompts: CustomPromptOption[];
   files: string[];
+  callables: WorkspaceCallableSymbol[];
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   setText: (next: string) => void;
   setSelectionStart: (next: number | null) => void;
@@ -31,9 +36,10 @@ type UseComposerAutocompleteStateArgs = {
 };
 
 const MAX_FILE_SUGGESTIONS = 500;
-const FILE_TRIGGER_PREFIX = new RegExp("^(?:\\s|[\"'`]|\\(|\\[|\\{)$");
+const MIN_FUNCTION_QUERY_LENGTH = 2;
+const PROJECT_TRIGGER_PREFIX = new RegExp("^(?:\\s|[\"'`]|\\(|\\[|\\{)$");
 
-function isFileTriggerActive(text: string, cursor: number | null) {
+function isProjectTriggerActive(text: string, cursor: number | null) {
   if (!text || cursor === null) {
     return false;
   }
@@ -43,14 +49,14 @@ function isFileTriggerActive(text: string, cursor: number | null) {
     return false;
   }
   const prevChar = atIndex > 0 ? beforeCursor[atIndex - 1] : "";
-  if (prevChar && !FILE_TRIGGER_PREFIX.test(prevChar)) {
+  if (prevChar && !PROJECT_TRIGGER_PREFIX.test(prevChar)) {
     return false;
   }
   const afterAt = beforeCursor.slice(atIndex + 1);
   return afterAt.length === 0 || !/\s/.test(afterAt);
 }
 
-function getFileTriggerQuery(text: string, cursor: number | null) {
+function getProjectTriggerQuery(text: string, cursor: number | null) {
   if (!text || cursor === null) {
     return null;
   }
@@ -60,7 +66,7 @@ function getFileTriggerQuery(text: string, cursor: number | null) {
     return null;
   }
   const prevChar = atIndex > 0 ? beforeCursor[atIndex - 1] : "";
-  if (prevChar && !FILE_TRIGGER_PREFIX.test(prevChar)) {
+  if (prevChar && !PROJECT_TRIGGER_PREFIX.test(prevChar)) {
     return null;
   }
   const afterAt = beforeCursor.slice(atIndex + 1);
@@ -79,6 +85,7 @@ export function useComposerAutocompleteState({
   apps,
   prompts,
   files,
+  callables,
   textareaRef,
   setText,
   setSelectionStart,
@@ -107,16 +114,21 @@ export function useComposerAutocompleteState({
     [apps, skills],
   );
 
-  const fileTriggerActive = useMemo(
-    () => isFileTriggerActive(text, selectionStart),
+  const projectTriggerActive = useMemo(
+    () => isProjectTriggerActive(text, selectionStart),
     [selectionStart, text],
   );
+
+  const projectTriggerQuery = useMemo(
+    () => getProjectTriggerQuery(text, selectionStart) ?? "",
+    [selectionStart, text],
+  );
+
   const fileItems = useMemo<AutocompleteItem[]>(
     () =>
-      fileTriggerActive
+      projectTriggerActive
         ? (() => {
-            const query = getFileTriggerQuery(text, selectionStart) ?? "";
-            const limited = query ? files : files.slice(0, MAX_FILE_SUGGESTIONS);
+            const limited = projectTriggerQuery ? files : files.slice(0, MAX_FILE_SUGGESTIONS);
             return limited.map((path) => ({
               id: path,
               label: path,
@@ -125,7 +137,26 @@ export function useComposerAutocompleteState({
             }));
           })()
         : [],
-    [fileTriggerActive, files, selectionStart, text],
+    [files, projectTriggerActive, projectTriggerQuery],
+  );
+
+  const callableItems = useMemo<AutocompleteItem[]>(
+    () =>
+      projectTriggerActive &&
+      projectTriggerQuery.trim().length >= MIN_FUNCTION_QUERY_LENGTH
+        ? callables.map((entry) => {
+            const reference = `${entry.path}#${entry.symbol}`;
+            return {
+              id: `callable:${reference}`,
+              label: entry.symbol,
+              description: entry.path,
+              insertText: reference,
+              searchText: reference,
+              group: "Functions" as const,
+            };
+          })
+        : [],
+    [callables, projectTriggerActive, projectTriggerQuery],
   );
 
   const promptItems = useMemo<AutocompleteItem[]>(
@@ -220,9 +251,9 @@ export function useComposerAutocompleteState({
     () => [
       { trigger: "/", items: slashItems },
       { trigger: "$", items: skillItems },
-      { trigger: "@", items: fileItems },
+      { trigger: "@", items: [...callableItems, ...fileItems] },
     ],
-    [fileItems, skillItems, slashItems],
+    [callableItems, fileItems, skillItems, slashItems],
   );
 
   const {
@@ -400,6 +431,6 @@ export function useComposerAutocompleteState({
     handleInputKeyDown,
     handleTextChange,
     handleSelectionChange,
-    fileTriggerActive,
+    projectTriggerActive,
   };
 }

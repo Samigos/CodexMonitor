@@ -11,6 +11,7 @@ import type {
   TcpDaemonStatus,
   TailscaleDaemonCommandPreview,
   TailscaleStatus,
+  WorkspaceCallableSymbol,
   WorkspaceInfo,
   AppMention,
   WorkspaceSettings,
@@ -903,6 +904,14 @@ export async function runCodexUpdate(
 
 export async function getWorkspaceFiles(workspaceId: string) {
   return invoke<string[]>("list_workspace_files", { workspaceId });
+}
+
+export async function getWorkspaceCallableSymbols(
+  workspaceId: string,
+): Promise<WorkspaceCallableSymbol[]> {
+  return invoke<WorkspaceCallableSymbol[]>("list_workspace_symbols", {
+    workspaceId,
+  });
 }
 
 export async function readWorkspaceFile(

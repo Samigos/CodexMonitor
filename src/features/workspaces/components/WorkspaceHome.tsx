@@ -14,6 +14,7 @@ import type {
   DictationTranscript,
   ModelOption,
   SkillOption,
+  WorkspaceCallableSymbol,
   WorkspaceInfo,
 } from "../../../types";
 import { ComposerInput } from "../../composer/components/ComposerInput";
@@ -72,6 +73,7 @@ type WorkspaceHomeProps = {
   apps: AppOption[];
   prompts: CustomPromptOption[];
   files: string[];
+  callables: WorkspaceCallableSymbol[];
   dictationEnabled: boolean;
   dictationState: DictationSessionState;
   dictationLevel: number;
@@ -85,7 +87,7 @@ type WorkspaceHomeProps = {
   dictationTranscript: DictationTranscript | null;
   onDictationTranscriptHandled: (id: string) => void;
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
-  onFileAutocompleteActiveChange?: (active: boolean) => void;
+  onProjectAutocompleteActiveChange?: (active: boolean) => void;
   agentMdContent: string;
   agentMdExists: boolean;
   agentMdTruncated: boolean;
@@ -135,6 +137,7 @@ export function WorkspaceHome({
   apps,
   prompts,
   files,
+  callables,
   dictationEnabled,
   dictationState,
   dictationLevel,
@@ -148,7 +151,7 @@ export function WorkspaceHome({
   dictationTranscript,
   onDictationTranscriptHandled,
   textareaRef: textareaRefProp,
-  onFileAutocompleteActiveChange,
+  onProjectAutocompleteActiveChange,
   agentMdContent,
   agentMdExists,
   agentMdTruncated,
@@ -187,7 +190,7 @@ export function WorkspaceHome({
     handleInputKeyDown,
     handleTextChange,
     handleSelectionChange,
-    fileTriggerActive,
+    projectTriggerActive,
   } = useComposerAutocompleteState({
     text: prompt,
     selectionStart,
@@ -197,6 +200,7 @@ export function WorkspaceHome({
     apps,
     prompts,
     files,
+    callables,
     textareaRef,
     setText: onPromptChange,
     setSelectionStart,
@@ -211,8 +215,8 @@ export function WorkspaceHome({
   });
 
   useEffect(() => {
-    onFileAutocompleteActiveChange?.(fileTriggerActive);
-  }, [fileTriggerActive, onFileAutocompleteActiveChange]);
+    onProjectAutocompleteActiveChange?.(projectTriggerActive);
+  }, [onProjectAutocompleteActiveChange, projectTriggerActive]);
 
   const {
     handleHistoryKeyDown,

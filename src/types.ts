@@ -598,6 +598,19 @@ export type AppMention = {
   path: string;
 };
 
+export type WorkspaceCallableSymbolKind =
+  | "function"
+  | "hook"
+  | "component"
+  | "method";
+
+export type WorkspaceCallableSymbol = {
+  path: string;
+  symbol: string;
+  kind: WorkspaceCallableSymbolKind;
+  language: string;
+};
+
 export type ModelOption = {
   id: string;
   model: string;

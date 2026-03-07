@@ -640,6 +640,27 @@ pub(crate) async fn list_workspace_files(
 }
 
 #[tauri::command]
+pub(crate) async fn list_workspace_symbols(
+    workspace_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<workspaces_core::WorkspaceCallableSymbol>, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        let request = workspace_rpc::WorkspaceIdRequest { workspace_id };
+        let response = remote_backend::call_remote(
+            &*state,
+            app,
+            "list_workspace_symbols",
+            workspace_remote_params(&request)?,
+        )
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
+    }
+
+    workspaces_core::list_workspace_symbols_core(&state.workspaces, &workspace_id).await
+}
+
+#[tauri::command]
 pub(crate) async fn open_workspace_in(
     path: String,
     app: Option<String>,

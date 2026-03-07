@@ -38,6 +38,7 @@ import type {
   ThreadSummary,
   ThreadTokenUsage,
   TurnPlan,
+  WorkspaceCallableSymbol,
   WorkspaceInfo,
 } from "../../../../types";
 import type {
@@ -391,7 +392,7 @@ export type LayoutNodesOptions = {
   ) => void | Promise<void>;
   onStop: () => void;
   canStop: boolean;
-  onFileAutocompleteActiveChange?: (active: boolean) => void;
+  onProjectAutocompleteActiveChange?: (active: boolean) => void;
   isReviewing: boolean;
   isProcessing: boolean;
   steerAvailable: boolean;
@@ -457,6 +458,7 @@ export type LayoutNodesOptions = {
   apps: AppOption[];
   prompts: CustomPromptOption[];
   files: string[];
+  callables: WorkspaceCallableSymbol[];
   onInsertComposerText: (text: string) => void;
   canInsertComposerText: boolean;
   textareaRef: RefObject<HTMLTextAreaElement | null>;

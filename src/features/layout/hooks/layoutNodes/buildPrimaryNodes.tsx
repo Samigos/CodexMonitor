@@ -129,7 +129,7 @@ export function buildPrimaryNodes(options: LayoutNodesOptions): PrimaryLayoutNod
       onStop={options.onStop}
       canStop={options.canStop}
       disabled={options.isReviewing}
-      onFileAutocompleteActiveChange={options.onFileAutocompleteActiveChange}
+      onProjectAutocompleteActiveChange={options.onProjectAutocompleteActiveChange}
       contextUsage={options.activeTokenUsage}
       queuedMessages={options.activeQueue}
       queuePausedReason={options.queuePausedReason}
@@ -170,6 +170,7 @@ export function buildPrimaryNodes(options: LayoutNodesOptions): PrimaryLayoutNod
       apps={options.apps}
       prompts={options.prompts}
       files={options.files}
+      callables={options.callables}
       textareaRef={options.textareaRef}
       historyKey={options.activeWorkspace?.id ?? null}
       editorSettings={options.composerEditorSettings}

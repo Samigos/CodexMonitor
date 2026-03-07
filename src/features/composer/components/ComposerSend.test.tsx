@@ -78,6 +78,7 @@ function ComposerHarness({
       apps={apps}
       prompts={[]}
       files={[]}
+      callables={[]}
       draftText={draftText}
       onDraftChange={setDraftText}
       textareaRef={textareaRef}

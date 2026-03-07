@@ -244,6 +244,7 @@ pub fn run() {
             git::get_github_pull_request_comments,
             git::checkout_github_pull_request,
             workspaces::list_workspace_files,
+            workspaces::list_workspace_symbols,
             workspaces::read_workspace_file,
             workspaces::open_workspace_in,
             workspaces::get_open_app_icon,

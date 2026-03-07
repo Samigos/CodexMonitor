@@ -16,6 +16,7 @@ import {
   getGitLog,
   getGitStatus,
   getOpenAppIcon,
+  getWorkspaceCallableSymbols,
   listThreads,
   listMcpServerStatus,
   readGlobalAgentsMd,
@@ -714,6 +715,31 @@ describe("tauri invoke wrappers", () => {
       accessMode: null,
       images: null,
       appMentions: [{ name: "Calendar", path: "app://connector_calendar" }],
+    });
+  });
+
+  it("lists workspace callable symbols", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce([
+      {
+        path: "src/hooks/useFoo.ts",
+        symbol: "useFoo",
+        kind: "hook",
+        language: "typescript",
+      },
+    ]);
+
+    await expect(getWorkspaceCallableSymbols("ws-4")).resolves.toEqual([
+      {
+        path: "src/hooks/useFoo.ts",
+        symbol: "useFoo",
+        kind: "hook",
+        language: "typescript",
+      },
+    ]);
+
+    expect(invokeMock).toHaveBeenCalledWith("list_workspace_symbols", {
+      workspaceId: "ws-4",
     });
   });
 
