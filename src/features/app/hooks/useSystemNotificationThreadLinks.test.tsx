@@ -22,11 +22,7 @@ describe("useSystemNotificationThreadLinks", () => {
 
     const refreshWorkspaces = vi.fn(async () => [workspace]);
     const connectWorkspace = vi.fn(async () => {});
-    const setActiveTab = vi.fn();
-    const setCenterMode = vi.fn();
-    const setSelectedDiffPath = vi.fn();
-    const setActiveWorkspaceId = vi.fn();
-    const setActiveThreadId = vi.fn();
+    const openThreadLink = vi.fn();
 
     const { result } = renderHook(() =>
       useSystemNotificationThreadLinks({
@@ -34,11 +30,7 @@ describe("useSystemNotificationThreadLinks", () => {
         workspacesById,
         refreshWorkspaces,
         connectWorkspace,
-        setActiveTab,
-        setCenterMode,
-        setSelectedDiffPath,
-        setActiveWorkspaceId,
-        setActiveThreadId,
+        openThreadLink,
       }),
     );
 
@@ -51,11 +43,7 @@ describe("useSystemNotificationThreadLinks", () => {
       await Promise.resolve();
     });
 
-    expect(setCenterMode).toHaveBeenCalledWith("chat");
-    expect(setSelectedDiffPath).toHaveBeenCalledWith(null);
-    expect(setActiveTab).toHaveBeenCalledWith("codex");
-    expect(setActiveWorkspaceId).toHaveBeenCalledWith("ws-1");
-    expect(setActiveThreadId).toHaveBeenCalledWith("t-1", "ws-1");
+    expect(openThreadLink).toHaveBeenCalledWith("ws-1", "t-1");
     expect(connectWorkspace).not.toHaveBeenCalled();
     expect(refreshWorkspaces).not.toHaveBeenCalled();
   });
@@ -66,11 +54,7 @@ describe("useSystemNotificationThreadLinks", () => {
 
     const refreshWorkspaces = vi.fn(async () => [workspace]);
     const connectWorkspace = vi.fn(async () => {});
-    const setActiveTab = vi.fn();
-    const setCenterMode = vi.fn();
-    const setSelectedDiffPath = vi.fn();
-    const setActiveWorkspaceId = vi.fn();
-    const setActiveThreadId = vi.fn();
+    const openThreadLink = vi.fn();
 
     const { result } = renderHook(() =>
       useSystemNotificationThreadLinks({
@@ -78,11 +62,7 @@ describe("useSystemNotificationThreadLinks", () => {
         workspacesById,
         refreshWorkspaces,
         connectWorkspace,
-        setActiveTab,
-        setCenterMode,
-        setSelectedDiffPath,
-        setActiveWorkspaceId,
-        setActiveThreadId,
+        openThreadLink,
       }),
     );
 
@@ -96,6 +76,32 @@ describe("useSystemNotificationThreadLinks", () => {
     });
 
     expect(connectWorkspace).toHaveBeenCalledTimes(1);
-    expect(setActiveThreadId).toHaveBeenCalledWith("t-1", "ws-1");
+    expect(openThreadLink).toHaveBeenCalledWith("ws-1", "t-1");
+  });
+
+  it("navigates immediately when openThreadLinkOrQueue is used after load", async () => {
+    const workspace = makeWorkspace({ connected: true });
+    const workspacesById = new Map([[workspace.id, workspace]]);
+
+    const refreshWorkspaces = vi.fn(async () => [workspace]);
+    const connectWorkspace = vi.fn(async () => {});
+    const openThreadLink = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSystemNotificationThreadLinks({
+        hasLoadedWorkspaces: true,
+        workspacesById,
+        refreshWorkspaces,
+        connectWorkspace,
+        openThreadLink,
+      }),
+    );
+
+    await act(async () => {
+      result.current.openThreadLinkOrQueue("ws-1", "t-2");
+      await Promise.resolve();
+    });
+
+    expect(openThreadLink).toHaveBeenCalledWith("ws-1", "t-2");
   });
 });

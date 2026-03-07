@@ -32,6 +32,8 @@ import {
   sendNotification,
   setCodexFeatureFlag,
   setAgentsCoreSettings,
+  setTrayRecentThreads,
+  setTraySessionUsage,
   startReview,
   setThreadName,
   tailscaleDaemonStart,
@@ -281,6 +283,39 @@ describe("tauri invoke wrappers", () => {
       cursor: "cursor-1",
       limit: 25,
       sortKey: "updated_at",
+    });
+  });
+
+  it("maps entries for set_tray_recent_threads", async () => {
+    const invokeMock = vi.mocked(invoke);
+    const entries = [
+      {
+        workspaceId: "ws-1",
+        workspaceLabel: "Workspace",
+        threadId: "thread-1",
+        threadLabel: "Alpha",
+        updatedAt: 10,
+      },
+    ];
+
+    await setTrayRecentThreads(entries);
+
+    expect(invokeMock).toHaveBeenCalledWith("set_tray_recent_threads", {
+      entries,
+    });
+  });
+
+  it("maps usage for set_tray_session_usage", async () => {
+    const invokeMock = vi.mocked(invoke);
+    const usage = {
+      sessionLabel: "12% used · Resets 2 hours",
+      weeklyLabel: "67% used · Resets in 2 days",
+    };
+
+    await setTraySessionUsage(usage);
+
+    expect(invokeMock).toHaveBeenCalledWith("set_tray_session_usage", {
+      usage,
     });
   });
 

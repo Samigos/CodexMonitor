@@ -1,4 +1,4 @@
-# App-Server Events Reference (Codex `f72ab43fd193b31208cd3c306293b1b71a52a709`)
+# App-Server Events Reference (Codex `5d4303510cc35571ae99a0a4a7d6ac40ccc03089`)
 
 This document helps agents quickly answer:
 - Which app-server events CodexMonitor supports right now.
@@ -50,43 +50,50 @@ Primary outgoing request layer:
 - `src-tauri/src/codex/mod.rs`
 - `src-tauri/src/bin/codex_monitor_daemon.rs`
 
-## Supported Events (Current)
+## Supported Notifications (Codex v2)
 
-These are the app-server methods currently supported in
-`src/utils/appServerEvents.ts` (`SUPPORTED_APP_SERVER_METHODS`) and then either
-routed in `useAppServerEvents.ts` or handled in feature-specific subscriptions.
+These are the current Codex v2 `ServerNotification` methods that CodexMonitor
+supports in `src/utils/appServerEvents.ts` (`SUPPORTED_APP_SERVER_METHODS`) and
+then either routes in `useAppServerEvents.ts` or handles in feature-specific
+subscriptions.
 
+- `account/login/completed`
+- `account/rateLimits/updated`
+- `account/updated`
 - `app/list/updated`
-- `codex/connected`
-- `*requestApproval` methods (matched via
-  `isApprovalRequestMethod(method)`; suffix check)
-- `item/tool/requestUserInput`
+- `error`
 - `item/agentMessage/delta`
-- `turn/started`
-- `thread/started`
+- `item/commandExecution/outputDelta`
+- `item/commandExecution/terminalInteraction`
+- `item/completed`
+- `item/fileChange/outputDelta`
+- `item/plan/delta`
+- `item/reasoning/summaryPartAdded`
+- `item/reasoning/summaryTextDelta`
+- `item/reasoning/textDelta`
+- `item/started`
 - `thread/archived`
 - `thread/closed`
 - `thread/name/updated`
+- `thread/started`
 - `thread/status/changed`
-- `thread/unarchived`
-- `codex/backgroundThread`
-- `error`
-- `turn/completed`
-- `turn/plan/updated`
-- `turn/diff/updated`
 - `thread/tokenUsage/updated`
-- `account/rateLimits/updated`
-- `account/updated`
-- `account/login/completed`
-- `item/started`
-- `item/completed`
-- `item/reasoning/summaryTextDelta`
-- `item/reasoning/summaryPartAdded`
-- `item/reasoning/textDelta`
-- `item/plan/delta`
-- `item/commandExecution/outputDelta`
-- `item/commandExecution/terminalInteraction`
-- `item/fileChange/outputDelta`
+- `thread/unarchived`
+- `turn/completed`
+- `turn/diff/updated`
+- `turn/plan/updated`
+- `turn/started`
+
+## Additional Stream Methods Handled In CodexMonitor
+
+These arrive on the same frontend event stream but are not Codex v2
+`ServerNotification` methods:
+
+- `item/commandExecution/requestApproval` and `item/fileChange/requestApproval`
+  via suffix match in `isApprovalRequestMethod(method)`
+- `item/tool/requestUserInput` (a Codex v2 server request, not a notification)
+- `codex/backgroundThread` (CodexMonitor synthetic bridge event)
+- `codex/connected` (CodexMonitor synthetic bridge event)
 - `codex/event/skills_update_available` (handled via
   `isSkillsUpdateAvailableEvent(...)` in `useSkills.ts`)
 
@@ -110,6 +117,8 @@ events are currently not routed:
 
 - `configWarning`
 - `deprecationNotice`
+- `fuzzyFileSearch/sessionCompleted`
+- `fuzzyFileSearch/sessionUpdated`
 - `item/mcpToolCall/progress`
 - `mcpServer/oauthLogin/completed`
 - `model/rerouted`
@@ -165,8 +174,13 @@ Compared against Codex v2 request methods, CodexMonitor currently does not send:
 - `externalAgentConfig/detect`
 - `externalAgentConfig/import`
 - `feedback/upload`
+- `fuzzyFileSearch/sessionStart`
+- `fuzzyFileSearch/sessionStop`
+- `fuzzyFileSearch/sessionUpdate`
 - `mcpServer/oauth/login`
 - `mock/experimentalMethod`
+- `plugin/install`
+- `plugin/list`
 - `skills/config/write`
 - `skills/remote/export`
 - `skills/remote/list`
@@ -187,13 +201,15 @@ Compared against Codex v2 request methods, CodexMonitor currently does not send:
 
 Supported server requests:
 
-- `*requestApproval` methods (handled via suffix match in `isApprovalRequestMethod(method)`)
+- `item/commandExecution/requestApproval`
+- `item/fileChange/requestApproval`
 - `item/tool/requestUserInput`
 
 Missing server requests:
 
 - `item/tool/call`
 - `account/chatgptAuthTokens/refresh`
+- `mcpServer/elicitation/request`
 
 ## Where To Look In ../Codex
 
@@ -215,7 +231,7 @@ Use this workflow to update the lists above:
 1. Get the current Codex hash:
    - `git -C ../Codex fetch --all --prune && git -C ../Codex rev-parse origin/main`
 2. List Codex v2 notification methods:
-   - `(git -C ../Codex show origin/main:codex-rs/app-server-protocol/src/protocol/common.rs | rg -N -o '=>\\s*\"[^\"]+\"\\s*\\(v2::[^)]*Notification\\)' | sed -E 's/.*\"([^\"]+)\".*/\\1/'; printf '%s\\n' 'account/login/completed') | sort -u`
+   - `git -C ../Codex show origin/main:codex-rs/app-server-protocol/src/protocol/common.rs | awk '/server_notification_definitions! \\{/,/client_notification_definitions! \\{/' | rg -N -o '=>\\s*\"[^\"]+\"|rename = \"[^\"]+\"' | sed -E 's/.*\"([^\"]+)\".*/\\1/' | sort -u`
 3. List CodexMonitor routed methods:
    - `rg -n \"SUPPORTED_APP_SERVER_METHODS\" src/utils/appServerEvents.ts`
 4. Update the Supported and Missing sections.

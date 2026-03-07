@@ -34,6 +34,7 @@ mod terminal;
 #[cfg(not(desktop))]
 #[path = "terminal_mobile.rs"]
 mod terminal;
+mod tray;
 mod types;
 mod utils;
 mod window;
@@ -93,6 +94,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = tauri::Builder::default()
         .manage(menu::MenuItemRegistry::<tauri::Wry>::default())
+        .manage(tray::TrayState::default())
         .on_menu_event(menu::handle_menu_event)
         .enable_macos_default_menu(false)
         .menu(menu::build_menu);
@@ -114,6 +116,11 @@ pub fn run() {
         .setup(|app| {
             let state = state::AppState::load(&app.handle());
             app.manage(state);
+            #[cfg(target_os = "macos")]
+            {
+                let tray_state = app.state::<tray::TrayState>();
+                tray::initialize(&app.handle(), tray_state.inner())?;
+            }
             #[cfg(target_os = "windows")]
             {
                 if let Some(main_window) = app.get_webview_window("main") {
@@ -182,6 +189,8 @@ pub fn run() {
             files::write_text_file,
             codex::get_config_model,
             menu::menu_set_accelerators,
+            tray::set_tray_recent_threads,
+            tray::set_tray_session_usage,
             codex::codex_doctor,
             codex::codex_update,
             workspaces::list_workspaces,

@@ -62,6 +62,24 @@ export type AppServerEvent = {
   message: Record<string, unknown>;
 };
 
+export type TrayRecentThreadEntry = {
+  workspaceId: string;
+  workspaceLabel: string;
+  threadId: string;
+  threadLabel: string;
+  updatedAt: number;
+};
+
+export type TraySessionUsage = {
+  sessionLabel: string;
+  weeklyLabel: string | null;
+};
+
+export type TrayOpenThreadPayload = {
+  workspaceId: string;
+  threadId: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";

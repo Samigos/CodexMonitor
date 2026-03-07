@@ -59,7 +59,7 @@ type MobileRemoteWorkspacePathPromptState = {
   recentPaths: string[];
 } | null;
 
-type AppModalsProps = {
+export type AppModalsProps = {
   renamePrompt: RenamePromptState;
   onRenamePromptChange: (value: string) => void;
   onRenamePromptCancel: () => void;

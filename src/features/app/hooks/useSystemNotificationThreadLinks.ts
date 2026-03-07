@@ -12,16 +12,13 @@ type Params = {
   workspacesById: Map<string, WorkspaceInfo>;
   refreshWorkspaces: () => Promise<WorkspaceInfo[] | undefined>;
   connectWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
-  setActiveTab: (tab: "home" | "projects" | "codex" | "git" | "log") => void;
-  setCenterMode: (mode: "chat" | "diff") => void;
-  setSelectedDiffPath: (path: string | null) => void;
-  setActiveWorkspaceId: (workspaceId: string | null) => void;
-  setActiveThreadId: (threadId: string | null, workspaceId?: string) => void;
+  openThreadLink: (workspaceId: string, threadId: string) => void;
   maxAgeMs?: number;
 };
 
 type Result = {
   recordPendingThreadLink: (workspaceId: string, threadId: string) => void;
+  openThreadLinkOrQueue: (workspaceId: string, threadId: string) => void;
 };
 
 export function useSystemNotificationThreadLinks({
@@ -29,17 +26,13 @@ export function useSystemNotificationThreadLinks({
   workspacesById,
   refreshWorkspaces,
   connectWorkspace,
-  setActiveTab,
-  setCenterMode,
-  setSelectedDiffPath,
-  setActiveWorkspaceId,
-  setActiveThreadId,
+  openThreadLink,
   maxAgeMs = 120_000,
 }: Params): Result {
   const pendingLinkRef = useRef<ThreadDeepLink | null>(null);
   const refreshInFlightRef = useRef(false);
 
-  const recordPendingThreadLink = useCallback((workspaceId: string, threadId: string) => {
+  const queuePendingThreadLink = useCallback((workspaceId: string, threadId: string) => {
     pendingLinkRef.current = { workspaceId, threadId, notifiedAt: Date.now() };
   }, []);
 
@@ -52,10 +45,6 @@ export function useSystemNotificationThreadLinks({
       pendingLinkRef.current = null;
       return;
     }
-
-    setCenterMode("chat");
-    setSelectedDiffPath(null);
-    setActiveTab("codex");
 
     let workspace = workspacesById.get(link.workspaceId) ?? null;
     if (!workspace && hasLoadedWorkspaces && !refreshInFlightRef.current) {
@@ -82,21 +71,26 @@ export function useSystemNotificationThreadLinks({
       }
     }
 
-    setActiveWorkspaceId(link.workspaceId);
-    setActiveThreadId(link.threadId, link.workspaceId);
+    openThreadLink(link.workspaceId, link.threadId);
     pendingLinkRef.current = null;
   }, [
     connectWorkspace,
     hasLoadedWorkspaces,
     maxAgeMs,
+    openThreadLink,
     refreshWorkspaces,
-    setActiveTab,
-    setActiveThreadId,
-    setActiveWorkspaceId,
-    setCenterMode,
-    setSelectedDiffPath,
     workspacesById,
   ]);
+
+  const openThreadLinkOrQueue = useCallback(
+    (workspaceId: string, threadId: string) => {
+      queuePendingThreadLink(workspaceId, threadId);
+      if (hasLoadedWorkspaces) {
+        void tryNavigateToLink();
+      }
+    },
+    [hasLoadedWorkspaces, queuePendingThreadLink, tryNavigateToLink],
+  );
 
   const focusHandler = useMemo(() => () => void tryNavigateToLink(), [tryNavigateToLink]);
 
@@ -115,5 +109,8 @@ export function useSystemNotificationThreadLinks({
     void tryNavigateToLink();
   }, [hasLoadedWorkspaces, tryNavigateToLink]);
 
-  return { recordPendingThreadLink };
+  return {
+    recordPendingThreadLink: queuePendingThreadLink,
+    openThreadLinkOrQueue,
+  };
 }
