@@ -12,7 +12,7 @@ import type { GitDiffSource, GitPanelMode } from "../types";
 import { buildPullRequestDraft } from "../../../utils/pullRequestPrompt";
 import { parsePullRequestReviewCommand } from "../utils/pullRequestReviewCommands";
 
-const KNOWN_SLASH_COMMAND_REGEX = /^\/(?:apps|fork|mcp|new|resume|status)\b/i;
+const KNOWN_SLASH_COMMAND_REGEX = /^\/(?:apps|fast|fork|mcp|new|resume|status)\b/i;
 
 type ComposerContextAction = {
   id: string;

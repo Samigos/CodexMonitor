@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AccessMode } from "@/types";
+import type { AccessMode, ServiceTier } from "@/types";
 import {
   STORAGE_KEY_THREAD_CODEX_PARAMS,
   type ThreadCodexParams,
@@ -12,7 +12,12 @@ import {
 type ThreadCodexParamsPatch = Partial<
   Pick<
     ThreadCodexParams,
-    "modelId" | "effort" | "accessMode" | "collaborationModeId" | "codexArgsOverride"
+    | "modelId"
+    | "effort"
+    | "serviceTier"
+    | "accessMode"
+    | "collaborationModeId"
+    | "codexArgsOverride"
   >
 >;
 
@@ -30,6 +35,7 @@ type UseThreadCodexParamsResult = {
 const DEFAULT_ENTRY: ThreadCodexParams = {
   modelId: null,
   effort: null,
+  serviceTier: undefined,
   accessMode: null,
   collaborationModeId: null,
   codexArgsOverride: null,
@@ -38,6 +44,13 @@ const DEFAULT_ENTRY: ThreadCodexParams = {
 
 function coerceAccessMode(value: unknown): AccessMode | null {
   if (value === "read-only" || value === "current" || value === "full-access") {
+    return value;
+  }
+  return null;
+}
+
+function coerceServiceTier(value: unknown): ServiceTier | null {
+  if (value === "fast" || value === "flex") {
     return value;
   }
   return null;
@@ -59,9 +72,18 @@ function sanitizeEntry(value: unknown): ThreadCodexParams | null {
         ? entry.codexArgsOverride
         : null
     : undefined;
+  const hasServiceTierField = Object.prototype.hasOwnProperty.call(entry, "serviceTier");
+  const serviceTier = hasServiceTierField
+    ? entry.serviceTier === undefined
+      ? undefined
+      : entry.serviceTier === null
+        ? null
+        : coerceServiceTier(entry.serviceTier)
+    : undefined;
   return {
     modelId: typeof entry.modelId === "string" ? entry.modelId : null,
     effort: typeof entry.effort === "string" ? entry.effort : null,
+    serviceTier,
     accessMode: coerceAccessMode(entry.accessMode),
     collaborationModeId:
       typeof entry.collaborationModeId === "string"

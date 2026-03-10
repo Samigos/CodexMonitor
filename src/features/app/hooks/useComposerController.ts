@@ -31,6 +31,7 @@ export function useComposerController({
   startCompact,
   startApps,
   startMcp,
+  startFast,
   startStatus,
 }: {
   activeThreadId: string | null;
@@ -66,6 +67,7 @@ export function useComposerController({
   startCompact: (text: string) => Promise<void>;
   startApps: (text: string) => Promise<void>;
   startMcp: (text: string) => Promise<void>;
+  startFast: (text: string) => Promise<void>;
   startStatus: (text: string) => Promise<void>;
 }) {
   const [composerDraftsByThread, setComposerDraftsByThread] = useState<
@@ -111,6 +113,7 @@ export function useComposerController({
     startCompact,
     startApps,
     startMcp,
+    startFast,
     startStatus,
     clearActiveImages,
   });

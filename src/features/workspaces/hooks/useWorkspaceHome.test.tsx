@@ -51,6 +51,7 @@ describe("useWorkspaceHome", () => {
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
     const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    const seedThreadCodexParams = vi.fn();
     vi.mocked(generateRunMetadata).mockResolvedValue({
       title: "Test run",
       worktreeName: "feat/test",
@@ -61,6 +62,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: null,
+        seedThreadCodexParams,
         addWorktreeAgent,
         connectWorkspace,
         startThreadForWorkspace,
@@ -85,6 +87,11 @@ describe("useWorkspaceHome", () => {
       [],
       expect.objectContaining({ model: "gpt-5.1-max" }),
     );
+    expect(seedThreadCodexParams).toHaveBeenCalledWith("wt-1", "thread-1", {
+      modelId: "id-1",
+      effort: null,
+      serviceTier: undefined,
+    });
   });
 
   it("allows image-only local runs", async () => {
@@ -92,6 +99,7 @@ describe("useWorkspaceHome", () => {
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
     const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    const seedThreadCodexParams = vi.fn();
     vi.mocked(generateRunMetadata).mockResolvedValue({
       title: "Image run",
       worktreeName: "feat/image",
@@ -102,6 +110,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: "id-1",
+        seedThreadCodexParams,
         addWorktreeAgent,
         connectWorkspace,
         startThreadForWorkspace,
@@ -121,6 +130,11 @@ describe("useWorkspaceHome", () => {
       ["img-1"],
       expect.objectContaining({ model: "gpt-5.1-max" }),
     );
+    expect(seedThreadCodexParams).toHaveBeenCalledWith("ws-1", "thread-1", {
+      modelId: "id-1",
+      effort: null,
+      serviceTier: undefined,
+    });
   });
 
   it("blocks worktree runs without model selections", async () => {

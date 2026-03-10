@@ -216,17 +216,17 @@ describe("useAppServerEvents", () => {
       listener?.({
         workspace_id: "ws-1",
         message: {
-          method: "workspace/requestApproval",
+          method: "item/permissions/requestApproval",
           id: 7,
-          params: { mode: "full" },
+          params: { mode: "full", threadId: "thread-2" },
         },
       });
     });
     expect(handlers.onApprovalRequest).toHaveBeenCalledWith({
       workspace_id: "ws-1",
       request_id: 7,
-      method: "workspace/requestApproval",
-      params: { mode: "full" },
+      method: "item/permissions/requestApproval",
+      params: { mode: "full", threadId: "thread-2" },
     });
 
     act(() => {

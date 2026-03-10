@@ -16,6 +16,7 @@ describe("useThreadCodexParams", () => {
       result.current.patchThreadCodexParams("ws-1", "thread-1", {
         modelId: "gpt-5.1",
         effort: "high",
+        serviceTier: "fast",
         accessMode: "full-access",
         collaborationModeId: "plan",
         codexArgsOverride: "--profile dev",
@@ -26,6 +27,7 @@ describe("useThreadCodexParams", () => {
       expect.objectContaining({
         modelId: "gpt-5.1",
         effort: "high",
+        serviceTier: "fast",
         accessMode: "full-access",
         collaborationModeId: "plan",
         codexArgsOverride: "--profile dev",
@@ -45,6 +47,7 @@ describe("useThreadCodexParams", () => {
         "ws-1:thread-1": {
           modelId: "gpt-4.1",
           effort: "medium",
+          serviceTier: "nope",
           accessMode: "nope",
           collaborationModeId: 99,
           codexArgsOverride: 12,
@@ -58,6 +61,7 @@ describe("useThreadCodexParams", () => {
     expect(result.current.getThreadCodexParams("ws-1", "thread-1")).toEqual({
       modelId: "gpt-4.1",
       effort: "medium",
+      serviceTier: null,
       accessMode: null,
       collaborationModeId: null,
       codexArgsOverride: null,
@@ -90,6 +94,7 @@ describe("useThreadCodexParams", () => {
         updatedAt: 123,
       }),
     );
+    expect(legacy?.serviceTier).toBeUndefined();
     expect(legacy?.codexArgsOverride).toBeUndefined();
   });
 
@@ -102,6 +107,7 @@ describe("useThreadCodexParams", () => {
         "ws-1:thread-2": {
           modelId: "gpt-5",
           effort: "low",
+          serviceTier: "fast",
           accessMode: "current",
           collaborationModeId: "default",
           codexArgsOverride: "--profile ws",
@@ -123,6 +129,7 @@ describe("useThreadCodexParams", () => {
     expect(result.current.getThreadCodexParams("ws-1", "thread-2")).toEqual({
       modelId: "gpt-5",
       effort: "low",
+      serviceTier: "fast",
       accessMode: "current",
       collaborationModeId: "default",
       codexArgsOverride: "--profile ws",

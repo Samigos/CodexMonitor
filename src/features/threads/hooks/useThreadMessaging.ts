@@ -5,11 +5,12 @@ import type {
   AccessMode,
   AppMention,
   ComposerSendIntent,
-  SendMessageResult,
   RateLimitSnapshot,
   CustomPromptOption,
   DebugEntry,
   ReviewTarget,
+  SendMessageResult,
+  ServiceTier,
   WorkspaceInfo,
 } from "@/types";
 import {
@@ -37,6 +38,7 @@ type SendMessageOptions = {
   skipPromptExpansion?: boolean;
   model?: string | null;
   effort?: string | null;
+  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   accessMode?: AccessMode;
   appMentions?: AppMention[];
@@ -49,7 +51,9 @@ type UseThreadMessagingOptions = {
   accessMode?: "read-only" | "current" | "full-access";
   model?: string | null;
   effort?: string | null;
+  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
+  onSelectServiceTier?: (tier: ServiceTier | null | undefined) => void;
   reviewDeliveryMode?: "inline" | "detached";
   steerEnabled: boolean;
   customPrompts: CustomPromptOption[];
@@ -127,13 +131,34 @@ function isStaleSteerTurnError(message: string): boolean {
   return normalized.includes("active turn") && normalized.includes("not found");
 }
 
+type FastCommandAction = "toggle" | "on" | "off" | "status" | "invalid";
+
+function parseFastCommand(text: string): FastCommandAction {
+  const arg = text.replace(/^\/fast\b/i, "").trim().toLowerCase();
+  if (!arg) {
+    return "toggle";
+  }
+  if (arg === "on") {
+    return "on";
+  }
+  if (arg === "off") {
+    return "off";
+  }
+  if (arg === "status") {
+    return "status";
+  }
+  return "invalid";
+}
+
 export function useThreadMessaging({
   activeWorkspace,
   activeThreadId,
   accessMode,
   model,
   effort,
+  serviceTier,
   collaborationMode,
+  onSelectServiceTier,
   reviewDeliveryMode = "inline",
   steerEnabled,
   customPrompts,
@@ -186,6 +211,8 @@ export function useThreadMessaging({
         options?.model !== undefined ? options.model : model;
       const resolvedEffort =
         options?.effort !== undefined ? options.effort : effort;
+      const resolvedServiceTier =
+        options?.serviceTier !== undefined ? options.serviceTier : serviceTier;
       const resolvedCollaborationMode =
         options?.collaborationMode !== undefined
           ? options.collaborationMode
@@ -219,6 +246,7 @@ export function useThreadMessaging({
           text_length: String(finalText.length),
           model: resolvedModel ?? "unknown",
           effort: resolvedEffort ?? "unknown",
+          service_tier: resolvedServiceTier ?? "default",
           collaboration_mode: sanitizedCollaborationMode ?? "unknown",
           send_intent: sendIntent,
         },
@@ -247,6 +275,7 @@ export function useThreadMessaging({
           images,
           model: resolvedModel,
           effort: resolvedEffort,
+          serviceTier: resolvedServiceTier,
           collaborationMode: sanitizedCollaborationMode,
           sendIntent,
           threadCustomName: customThreadName,
@@ -267,6 +296,7 @@ export function useThreadMessaging({
           const payload: {
             model?: string | null;
             effort?: string | null;
+            serviceTier?: ServiceTier | null | undefined;
             collaborationMode?: Record<string, unknown> | null;
             accessMode?: AccessMode;
             images?: string[];
@@ -278,6 +308,9 @@ export function useThreadMessaging({
             accessMode: resolvedAccessMode,
             images,
           };
+          if (resolvedServiceTier !== undefined) {
+            payload.serviceTier = resolvedServiceTier;
+          }
           if (appMentions.length > 0) {
             payload.appMentions = appMentions;
           }
@@ -390,6 +423,7 @@ export function useThreadMessaging({
       customPrompts,
       dispatch,
       effort,
+      serviceTier,
       ensureWorkspaceRuntimeCodexArgs,
       shouldPreflightRuntimeCodexArgsForSend,
       activeTurnIdByThread,
@@ -633,6 +667,7 @@ export function useThreadMessaging({
       reviewDeliveryMode,
       registerDetachedReviewChild,
       renameThread,
+      serviceTier,
       updateThreadParent,
     ],
   );
@@ -737,6 +772,7 @@ export function useThreadMessaging({
       const lines = [
         "Session status:",
         `- Model: ${model ?? "default"}`,
+        `- Fast mode: ${serviceTier === "fast" ? "on" : "off"}`,
         `- Reasoning effort: ${effort ?? "default"}`,
         `- Access: ${accessMode ?? "current"}`,
         `- Collaboration: ${collabId || "off"}`,
@@ -783,9 +819,62 @@ export function useThreadMessaging({
       effort,
       ensureThreadForActiveWorkspace,
       model,
+      serviceTier,
       rateLimitsByWorkspace,
       recordThreadActivity,
       safeMessageActivity,
+    ],
+  );
+
+  const startFast = useCallback(
+    async (text: string) => {
+      if (!activeWorkspace) {
+        return;
+      }
+      const threadId = await ensureThreadForActiveWorkspace();
+      if (!threadId) {
+        return;
+      }
+
+      const action = parseFastCommand(text);
+      const isEnabled = serviceTier === "fast";
+      let nextTier = serviceTier ?? null;
+      let message = "";
+
+      if (action === "invalid") {
+        message = "Usage: /fast, /fast on, /fast off, or /fast status.";
+      } else if (action === "status") {
+        message = `Fast mode is ${isEnabled ? "on" : "off"}.`;
+      } else {
+        nextTier =
+          action === "on"
+            ? "fast"
+            : action === "off"
+              ? null
+              : isEnabled
+                ? null
+                : "fast";
+        onSelectServiceTier?.(nextTier);
+        message = `Fast mode ${nextTier === "fast" ? "enabled" : "disabled"}.`;
+      }
+
+      const timestamp = Date.now();
+      recordThreadActivity(activeWorkspace.id, threadId, timestamp);
+      dispatch({
+        type: "addAssistantMessage",
+        threadId,
+        text: message,
+      });
+      safeMessageActivity();
+    },
+    [
+      activeWorkspace,
+      dispatch,
+      ensureThreadForActiveWorkspace,
+      onSelectServiceTier,
+      recordThreadActivity,
+      safeMessageActivity,
+      serviceTier,
     ],
   );
 
@@ -1070,6 +1159,7 @@ export function useThreadMessaging({
     startCompact,
     startApps,
     startMcp,
+    startFast,
     startStatus,
     reviewPrompt,
     openReviewPrompt,

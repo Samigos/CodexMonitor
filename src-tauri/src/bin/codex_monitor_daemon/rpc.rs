@@ -85,6 +85,21 @@ pub(super) fn parse_optional_string(value: &Value, key: &str) -> Option<String> 
     }
 }
 
+pub(super) fn parse_optional_nullable_string(
+    value: &Value,
+    key: &str,
+) -> Option<Option<String>> {
+    match value {
+        Value::Object(map) => match map.get(key) {
+            Some(Value::Null) => Some(None),
+            Some(Value::String(value)) => Some(Some(value.to_string())),
+            Some(_) => None,
+            None => None,
+        },
+        _ => None,
+    }
+}
+
 pub(super) fn parse_optional_u32(value: &Value, key: &str) -> Option<u32> {
     match value {
         Value::Object(map) => map.get(key).and_then(|value| value.as_u64()).and_then(|v| {

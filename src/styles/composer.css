@@ -808,6 +808,17 @@
   transform: translateY(1px);
 }
 
+.composer-fast-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  color: var(--accent-warning-strong, #b45309);
+  background: color-mix(in srgb, var(--accent-warning-strong, #b45309) 16%, transparent);
+}
+
 .composer-select {
   appearance: none;
   border: none;

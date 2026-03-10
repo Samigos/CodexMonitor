@@ -371,6 +371,16 @@ fn build_turn_input_items(
     Ok(input)
 }
 
+pub(crate) fn insert_optional_nullable_string(
+    params: &mut Map<String, Value>,
+    key: &str,
+    value: Option<Option<String>>,
+) {
+    if let Some(value) = value {
+        params.insert(key.to_string(), json!(value));
+    }
+}
+
 pub(crate) async fn send_user_message_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
@@ -379,6 +389,7 @@ pub(crate) async fn send_user_message_core(
     text: String,
     model: Option<String>,
     effort: Option<String>,
+    service_tier: Option<Option<String>>,
     access_mode: Option<String>,
     images: Option<Vec<String>>,
     app_mentions: Option<Vec<Value>>,
@@ -413,6 +424,7 @@ pub(crate) async fn send_user_message_core(
     params.insert("sandboxPolicy".to_string(), json!(sandbox_policy));
     params.insert("model".to_string(), json!(model));
     params.insert("effort".to_string(), json!(effort));
+    insert_optional_nullable_string(&mut params, "serviceTier", service_tier);
     if let Some(mode) = collaboration_mode {
         if !mode.is_null() {
             params.insert("collaborationMode".to_string(), mode);
@@ -789,6 +801,7 @@ pub(crate) async fn get_config_model_core(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn normalize_strips_file_uri_prefix() {
@@ -904,5 +917,23 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn insert_optional_nullable_string_omits_missing_and_preserves_null() {
+        let mut params = Map::new();
+
+        insert_optional_nullable_string(&mut params, "serviceTier", None);
+        assert!(!params.contains_key("serviceTier"));
+
+        insert_optional_nullable_string(&mut params, "serviceTier", Some(None));
+        assert_eq!(params.get("serviceTier"), Some(&Value::Null));
+
+        insert_optional_nullable_string(
+            &mut params,
+            "serviceTier",
+            Some(Some("fast".to_string())),
+        );
+        assert_eq!(params.get("serviceTier"), Some(&json!("fast")));
     }
 }

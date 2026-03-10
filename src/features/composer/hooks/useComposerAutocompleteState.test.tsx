@@ -104,6 +104,7 @@ describe("useComposerAutocompleteState slash commands", () => {
       expect.arrayContaining([
         "apps",
         "compact",
+        "fast",
         "fork",
         "mcp",
         "new",
@@ -112,9 +113,10 @@ describe("useComposerAutocompleteState slash commands", () => {
         "status",
       ]),
     );
-    expect(labels.slice(0, 8)).toEqual([
+    expect(labels.slice(0, 9)).toEqual([
       "apps",
       "compact",
+      "fast",
       "fork",
       "mcp",
       "new",
@@ -152,7 +154,16 @@ describe("useComposerAutocompleteState slash commands", () => {
 
     const labels = result.current.autocompleteMatches.map((item) => item.label);
     expect(labels).not.toContain("apps");
-    expect(labels).toEqual(["compact", "fork", "mcp", "new", "resume", "review", "status"]);
+    expect(labels).toEqual([
+      "compact",
+      "fast",
+      "fork",
+      "mcp",
+      "new",
+      "resume",
+      "review",
+      "status",
+    ]);
   });
 });
 

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ModelOption, SendMessageResult, WorkspaceInfo } from "../../../types";
+import type {
+  ModelOption,
+  SendMessageResult,
+  ServiceTier,
+  WorkspaceInfo,
+} from "../../../types";
 import { generateRunMetadata } from "../../../services/tauri";
 
 export type WorkspaceRunMode = "local" | "worktree";
@@ -31,7 +36,17 @@ type UseWorkspaceHomeOptions = {
   models: ModelOption[];
   selectedModelId: string | null;
   effort?: string | null;
+  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
+  seedThreadCodexParams?: (
+    workspaceId: string,
+    threadId: string,
+    patch: {
+      modelId: string | null;
+      effort: string | null;
+      serviceTier: ServiceTier | null | undefined;
+    },
+  ) => void;
   addWorktreeAgent: (
     workspace: WorkspaceInfo,
     branch: string,
@@ -50,6 +65,7 @@ type UseWorkspaceHomeOptions = {
     options?: {
       model?: string | null;
       effort?: string | null;
+      serviceTier?: ServiceTier | null | undefined;
       collaborationMode?: Record<string, unknown> | null;
     },
   ) => Promise<void | SendMessageResult>;
@@ -173,7 +189,9 @@ export function useWorkspaceHome({
   models,
   selectedModelId,
   effort = null,
+  serviceTier = undefined,
   collaborationMode = null,
+  seedThreadCodexParams,
   addWorktreeAgent,
   connectWorkspace,
   startThreadForWorkspace,
@@ -472,12 +490,18 @@ export function useWorkspaceHome({
           if (!threadId) {
             throw new Error("Failed to start a local thread.");
           }
+          seedThreadCodexParams?.(activeWorkspace.id, threadId, {
+            modelId: selectedModelId,
+            effort,
+            serviceTier,
+          });
           const localModel = selectedModelId
             ? modelLookup.get(selectedModelId)?.model ?? null
             : null;
           await sendUserMessageToThread(activeWorkspace, threadId, prompt, images, {
             model: localModel,
             effort,
+            serviceTier,
             collaborationMode,
           });
           const model =
@@ -533,6 +557,11 @@ export function useWorkspaceHome({
               if (!threadId) {
                 throw new Error("Failed to start a worktree thread.");
               }
+              seedThreadCodexParams?.(worktreeWorkspace.id, threadId, {
+                modelId: selection.modelId,
+                effort,
+                serviceTier,
+              });
               await sendUserMessageToThread(
                 worktreeWorkspace,
                 threadId,
@@ -541,6 +570,7 @@ export function useWorkspaceHome({
                 {
                   model: selection.model?.model ?? selection.modelId,
                   effort,
+                  serviceTier,
                   collaborationMode,
                 },
               );
@@ -601,7 +631,9 @@ export function useWorkspaceHome({
     modelSelections,
     updateRunState,
     runMode,
+    seedThreadCodexParams,
     selectedModelId,
+    serviceTier,
     sendUserMessageToThread,
     setSubmitting,
     setWorkspaceError,

@@ -188,6 +188,13 @@ export function useComposerAutocompleteState({
         group: "Slash",
       },
       {
+        id: "fast",
+        label: "fast",
+        description: "toggle Fast mode for upcoming turns",
+        insertText: "fast",
+        group: "Slash",
+      },
+      {
         id: "fork",
         label: "fork",
         description: "branch into a new thread",

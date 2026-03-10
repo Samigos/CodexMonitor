@@ -160,6 +160,7 @@ pub(super) async fn try_handle(
             };
             let model = parse_optional_string(params, "model");
             let effort = parse_optional_string(params, "effort");
+            let service_tier = parse_optional_nullable_string(params, "serviceTier");
             let access_mode = parse_optional_string(params, "accessMode");
             let images = parse_optional_string_array(params, "images");
             let app_mentions = parse_optional_value(params, "appMentions")
@@ -173,6 +174,7 @@ pub(super) async fn try_handle(
                         text,
                         model,
                         effort,
+                        service_tier,
                         access_mode,
                         images,
                         app_mentions,

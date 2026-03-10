@@ -14,7 +14,7 @@ use crate::backend::events::AppServerEvent;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
 use crate::shared::agents_config_core;
-use crate::shared::codex_core;
+use crate::shared::codex_core::{self, insert_optional_nullable_string};
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
 
@@ -322,6 +322,7 @@ pub(crate) async fn send_user_message(
     text: String,
     model: Option<String>,
     effort: Option<String>,
+    service_tier: Option<Option<String>>,
     access_mode: Option<String>,
     images: Option<Vec<String>>,
     app_mentions: Option<Vec<Value>>,
@@ -342,6 +343,7 @@ pub(crate) async fn send_user_message(
         payload.insert("text".to_string(), json!(text));
         payload.insert("model".to_string(), json!(model));
         payload.insert("effort".to_string(), json!(effort));
+        insert_optional_nullable_string(&mut payload, "serviceTier", service_tier);
         payload.insert("accessMode".to_string(), json!(access_mode));
         payload.insert("images".to_string(), json!(images));
         payload.insert("appMentions".to_string(), json!(app_mentions));
@@ -367,6 +369,7 @@ pub(crate) async fn send_user_message(
         text,
         model,
         effort,
+        service_tier,
         access_mode,
         images,
         app_mentions,
@@ -485,7 +488,14 @@ pub(crate) async fn start_review(
         .await;
     }
 
-    codex_core::start_review_core(&state.sessions, workspace_id, thread_id, target, delivery).await
+    codex_core::start_review_core(
+        &state.sessions,
+        workspace_id,
+        thread_id,
+        target,
+        delivery,
+    )
+    .await
 }
 
 #[tauri::command]

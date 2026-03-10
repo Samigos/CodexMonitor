@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react";
 import type {
   CustomPromptOption,
   DebugEntry,
+  ServiceTier,
   ThreadListSortKey,
   WorkspaceInfo,
 } from "@/types";
@@ -44,8 +45,10 @@ type UseThreadsOptions = {
   ) => Promise<void>;
   model?: string | null;
   effort?: string | null;
+  serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
   accessMode?: "read-only" | "current" | "full-access";
+  onSelectServiceTier?: (tier: ServiceTier | null | undefined) => void;
   reviewDeliveryMode?: "inline" | "detached";
   steerEnabled?: boolean;
   threadTitleAutogenerationEnabled?: boolean;
@@ -73,8 +76,10 @@ export function useThreads({
   ensureWorkspaceRuntimeCodexArgs,
   model,
   effort,
+  serviceTier,
   collaborationMode,
   accessMode,
+  onSelectServiceTier,
   reviewDeliveryMode = "inline",
   steerEnabled = false,
   threadTitleAutogenerationEnabled = false,
@@ -716,6 +721,7 @@ export function useThreads({
     startCompact,
     startApps,
     startMcp,
+    startFast,
     startStatus,
     reviewPrompt,
     openReviewPrompt,
@@ -743,7 +749,9 @@ export function useThreads({
     accessMode,
     model,
     effort,
+    serviceTier,
     collaborationMode,
+    onSelectServiceTier,
     reviewDeliveryMode,
     steerEnabled,
     customPrompts,
@@ -885,6 +893,7 @@ export function useThreads({
     startCompact,
     startApps,
     startMcp,
+    startFast,
     startStatus,
     reviewPrompt,
     openReviewPrompt,
