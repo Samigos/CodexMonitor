@@ -682,9 +682,13 @@ describe("SettingsView Environments", () => {
     ).toBeTruthy();
     const textarea = screen.getByPlaceholderText("pnpm install");
     expect((textarea as HTMLTextAreaElement).value).toBe("echo one");
+    const field = textarea.closest(".settings-field") as HTMLElement | null;
+    if (!field) {
+      throw new Error("Expected setup script field");
+    }
 
     fireEvent.change(textarea, { target: { value: "echo updated" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(within(field).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(onUpdateWorkspaceSettings).toHaveBeenCalledWith("w1", {
@@ -698,8 +702,12 @@ describe("SettingsView Environments", () => {
     renderEnvironmentsSection({ onUpdateWorkspaceSettings });
 
     const textarea = screen.getByPlaceholderText("pnpm install");
+    const field = textarea.closest(".settings-field") as HTMLElement | null;
+    if (!field) {
+      throw new Error("Expected setup script field");
+    }
     fireEvent.change(textarea, { target: { value: "   \n\t" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(within(field).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(onUpdateWorkspaceSettings).toHaveBeenCalledWith("w1", {

@@ -12,9 +12,14 @@ export type AutocompleteItem = {
   mentionPath?: string;
 };
 
+type AutocompleteGroup = NonNullable<AutocompleteItem["group"]>;
+type AutocompleteGroupLimits = Partial<Record<AutocompleteGroup, number>>;
+
 export type AutocompleteTrigger = {
   trigger: string;
   items: AutocompleteItem[];
+  maxResults?: number;
+  groupLimits?: AutocompleteGroupLimits;
 };
 
 type AutocompleteRange = {
@@ -149,10 +154,15 @@ function scoreFileMatch(query: string, label: string) {
   return 0;
 }
 
-function scoreTextMatch(query: string, target: string) {
+function scoreTextMatch(
+  query: string,
+  target: string,
+  options?: { allowSubsequence?: boolean },
+) {
   if (!query || !target) {
     return 0;
   }
+  const allowSubsequence = options?.allowSubsequence ?? true;
   const normalizedTarget = target.toLowerCase();
   if (normalizedTarget === query) {
     return 120;
@@ -163,10 +173,14 @@ function scoreTextMatch(query: string, target: string) {
   if (normalizedTarget.includes(query)) {
     return 80;
   }
-  if (isSubsequence(query, normalizedTarget)) {
+  if (allowSubsequence && isSubsequence(query, normalizedTarget)) {
     return 55;
   }
   return 0;
+}
+
+function scoreWithBonus(score: number, bonus: number) {
+  return score > 0 ? score + bonus : 0;
 }
 
 function scoreFunctionMatch(query: string, item: AutocompleteItem) {
@@ -175,9 +189,9 @@ function scoreFunctionMatch(query: string, item: AutocompleteItem) {
   const combined = (item.searchText ?? `${path}#${symbol}`).toLowerCase();
 
   return Math.max(
-    scoreTextMatch(query, symbol) + 25,
-    scoreTextMatch(query, combined) + 10,
-    scoreTextMatch(query, path),
+    scoreWithBonus(scoreTextMatch(query, symbol), 25),
+    scoreWithBonus(scoreTextMatch(query, combined, { allowSubsequence: false }), 10),
+    scoreTextMatch(query, path, { allowSubsequence: false }),
   );
 }
 
@@ -196,10 +210,10 @@ function scoreItem(query: string, item: AutocompleteItem) {
 
 function groupPriority(group: AutocompleteItem["group"]) {
   switch (group) {
+    case "Files":
+      return 0;
     case "Functions":
       return 0;
-    case "Files":
-      return 1;
     case "Skills":
       return 0;
     case "Apps":
@@ -240,6 +254,29 @@ function rankItems(items: AutocompleteItem[], query: string) {
   return ranked.map((entry) => entry.item);
 }
 
+function applyGroupLimits(items: AutocompleteItem[], groupLimits?: AutocompleteGroupLimits) {
+  if (!groupLimits) {
+    return items;
+  }
+  const counts: Partial<Record<AutocompleteGroup, number>> = {};
+  return items.filter((item) => {
+    const group = item.group;
+    if (!group) {
+      return true;
+    }
+    const limit = groupLimits[group];
+    if (limit === undefined) {
+      return true;
+    }
+    const nextCount = (counts[group] ?? 0) + 1;
+    if (nextCount > limit) {
+      return false;
+    }
+    counts[group] = nextCount;
+    return true;
+  });
+}
+
 export function useComposerAutocomplete({
   text,
   selectionStart,
@@ -265,7 +302,9 @@ export function useComposerAutocomplete({
       return [];
     }
     const ranked = rankItems(source.items, state.query);
-    return ranked.slice(0, Math.max(0, maxResults));
+    const limited = applyGroupLimits(ranked, source.groupLimits);
+    const effectiveMaxResults = source.maxResults ?? maxResults;
+    return limited.slice(0, Math.max(0, effectiveMaxResults));
   }, [state.active, state.query, state.trigger, triggers, maxResults]);
 
   useEffect(() => {

@@ -129,8 +129,8 @@ where
 mod tests {
     use super::*;
 
-    use std::process::Stdio;
     use std::collections::HashSet;
+    use std::process::Stdio;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
     use tokio::process::Command;

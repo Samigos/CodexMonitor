@@ -79,14 +79,12 @@ fn extract_related_thread_ids(value: &Value) -> Vec<String> {
         push_thread_id(out, record.get("id"));
         push_thread_id(
             out,
-            record
-                .get("thread")
-                .and_then(|thread| {
-                    thread
-                        .get("id")
-                        .or_else(|| thread.get("threadId"))
-                        .or_else(|| thread.get("thread_id"))
-                }),
+            record.get("thread").and_then(|thread| {
+                thread
+                    .get("id")
+                    .or_else(|| thread.get("threadId"))
+                    .or_else(|| thread.get("thread_id"))
+            }),
         );
     }
 
@@ -94,12 +92,15 @@ fn extract_related_thread_ids(value: &Value) -> Vec<String> {
         let Some(container) = container.and_then(|value| value.as_object()) else {
             return;
         };
-        push_thread_id(out, container.get("threadId").or_else(|| container.get("thread_id")));
         push_thread_id(
             out,
             container
-                .get("thread")
-                .and_then(|thread| thread.get("id")),
+                .get("threadId")
+                .or_else(|| container.get("thread_id")),
+        );
+        push_thread_id(
+            out,
+            container.get("thread").and_then(|thread| thread.get("id")),
         );
         push_thread_id(
             out,
@@ -149,7 +150,10 @@ fn extract_related_thread_ids(value: &Value) -> Vec<String> {
                 .or_else(|| container.get("agent_statuses")),
             out,
         );
-        if let Some(status_map) = container.get("statuses").and_then(|value| value.as_object()) {
+        if let Some(status_map) = container
+            .get("statuses")
+            .and_then(|value| value.as_object())
+        {
             out.extend(
                 status_map
                     .keys()
@@ -192,10 +196,8 @@ fn normalize_root_path(value: &str) -> String {
     }
 
     let bytes = normalized.as_bytes();
-    let is_drive_path = bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && bytes[2] == b'/';
+    let is_drive_path =
+        bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'/';
     if is_drive_path || normalized.starts_with("//") {
         normalized.to_ascii_lowercase()
     } else {
@@ -903,12 +905,20 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                         .and_then(Value::as_str)
                         .unwrap_or("hide");
                     if action.eq_ignore_ascii_case("hide") {
-                        session_clone.hidden_thread_ids.lock().await.insert(tid.clone());
+                        session_clone
+                            .hidden_thread_ids
+                            .lock()
+                            .await
+                            .insert(tid.clone());
                     }
                 } else if method_name == Some("thread/started")
                     && thread_started_is_memory_consolidation(&value)
                 {
-                    session_clone.hidden_thread_ids.lock().await.insert(tid.clone());
+                    session_clone
+                        .hidden_thread_ids
+                        .lock()
+                        .await
+                        .insert(tid.clone());
                     let payload = AppServerEvent {
                         workspace_id: routed_workspace_id.clone(),
                         message: json!({
@@ -1105,13 +1115,13 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_initialize_params, extract_related_thread_ids, extract_thread_entries_from_thread_list_result,
-        extract_thread_id, normalize_root_path, resolve_workspace_for_cwd,
-        should_suppress_hidden_thread_event, source_subagent_kind,
+        build_initialize_params, extract_related_thread_ids,
+        extract_thread_entries_from_thread_list_result, extract_thread_id, normalize_root_path,
+        resolve_workspace_for_cwd, should_suppress_hidden_thread_event, source_subagent_kind,
         thread_started_is_memory_consolidation,
     };
-    use std::collections::HashMap;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn extract_thread_id_reads_camel_case() {
@@ -1353,8 +1363,14 @@ mod tests {
 
     #[test]
     fn hidden_thread_suppression_allows_rpc_responses() {
-        assert!(!should_suppress_hidden_thread_event(Some("thread/archived"), true));
-        assert!(!should_suppress_hidden_thread_event(Some("thread/updated"), true));
+        assert!(!should_suppress_hidden_thread_event(
+            Some("thread/archived"),
+            true
+        ));
+        assert!(!should_suppress_hidden_thread_event(
+            Some("thread/updated"),
+            true
+        ));
         assert!(!should_suppress_hidden_thread_event(None, true));
     }
 

@@ -1,8 +1,4 @@
-import type {
-  AppSettings,
-  OpenAppTarget,
-  WorkspaceInfo,
-} from "@/types";
+import type { AppSettings, OpenAppTarget, WorkspaceInfo } from "@/types";
 import type { OpenAppDraft, ShortcutDrafts } from "./settingsTypes";
 import { SETTINGS_MOBILE_BREAKPOINT_PX } from "./settingsViewConstants";
 
@@ -32,10 +28,14 @@ export const buildWorkspaceOverrideDrafts = (
 };
 
 export const isNarrowSettingsViewport = (): boolean => {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
     return false;
   }
-  return window.matchMedia(`(max-width: ${SETTINGS_MOBILE_BREAKPOINT_PX}px)`).matches;
+  return window.matchMedia(`(max-width: ${SETTINGS_MOBILE_BREAKPOINT_PX}px)`)
+    .matches;
 };
 
 export const buildOpenAppDrafts = (targets: OpenAppTarget[]): OpenAppDraft[] =>
@@ -90,7 +90,9 @@ export const createOpenAppId = () => {
   return `open-app-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-export const buildShortcutDrafts = (appSettings: AppSettings): ShortcutDrafts => ({
+export const buildShortcutDrafts = (
+  appSettings: AppSettings,
+): ShortcutDrafts => ({
   model: appSettings.composerModelShortcut ?? "",
   access: appSettings.composerAccessShortcut ?? "",
   reasoning: appSettings.composerReasoningShortcut ?? "",
@@ -126,7 +128,13 @@ export const buildEditorContentMeta = ({
   truncated,
   isDirty,
 }: EditorContentMetaInput) => {
-  const status = isLoading ? "Loading…" : isSaving ? "Saving…" : exists ? "" : "Not found";
+  const status = isLoading
+    ? "Loading…"
+    : isSaving
+      ? "Saving…"
+      : exists
+        ? ""
+        : "Not found";
   const metaParts: string[] = [];
   if (status) {
     metaParts.push(status);

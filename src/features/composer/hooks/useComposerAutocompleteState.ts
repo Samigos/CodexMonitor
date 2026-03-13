@@ -36,6 +36,8 @@ type UseComposerAutocompleteStateArgs = {
 };
 
 const MAX_FILE_SUGGESTIONS = 500;
+const MAX_FILE_MATCHES = 50;
+const MAX_FUNCTION_MATCHES = 20;
 const MIN_FUNCTION_QUERY_LENGTH = 2;
 const PROJECT_TRIGGER_PREFIX = new RegExp("^(?:\\s|[\"'`]|\\(|\\[|\\{)$");
 
@@ -258,7 +260,15 @@ export function useComposerAutocompleteState({
     () => [
       { trigger: "/", items: slashItems },
       { trigger: "$", items: skillItems },
-      { trigger: "@", items: [...callableItems, ...fileItems] },
+      {
+        trigger: "@",
+        items: [...callableItems, ...fileItems],
+        maxResults: MAX_FUNCTION_MATCHES + MAX_FILE_MATCHES,
+        groupLimits: {
+          Functions: MAX_FUNCTION_MATCHES,
+          Files: MAX_FILE_MATCHES,
+        },
+      },
     ],
     [callableItems, fileItems, skillItems, slashItems],
   );

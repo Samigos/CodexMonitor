@@ -307,7 +307,10 @@ fn build_usage_menu_labels(usage: Option<&TraySessionUsage>) -> (String, String,
         usage
             .map(|usage| format!("Session: {}", usage.session_label))
             .unwrap_or_else(|| "No active session".to_string()),
-        usage.map(|usage| usage.weekly_label.clone()).unwrap_or(None).map(|label| format!("Weekly: {label}")),
+        usage
+            .map(|usage| usage.weekly_label.clone())
+            .unwrap_or(None)
+            .map(|label| format!("Weekly: {label}")),
     )
 }
 

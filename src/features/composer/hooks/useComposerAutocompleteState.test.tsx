@@ -2,6 +2,7 @@
 import { createRef } from "react";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { WorkspaceCallableSymbol } from "../../../types";
 import { useComposerAutocompleteState } from "./useComposerAutocompleteState";
 
 describe("useComposerAutocompleteState file mentions", () => {
@@ -275,6 +276,15 @@ describe("useComposerAutocompleteState $ completions", () => {
       description: "src/hooks/useTheme.ts",
       insertText: "src/hooks/useTheme.ts#useTheme",
     });
+    expect(result.current.autocompleteMatches[1]).toMatchObject({
+      label: "useComposerAutocompleteState",
+      description: "src/hooks/useComposerAutocompleteState.ts",
+      insertText: "src/hooks/useComposerAutocompleteState.ts#useComposerAutocompleteState",
+    });
+    expect(result.current.autocompleteMatches[2]).toMatchObject({
+      label: "src/hooks/useTheme.ts",
+      insertText: "src/hooks/useTheme.ts",
+    });
   });
 
   it("does not show function suggestions on an empty @ query", () => {
@@ -311,5 +321,129 @@ describe("useComposerAutocompleteState $ completions", () => {
     );
 
     expect(result.current.autocompleteMatches.map((item) => item.group)).toEqual(["Files"]);
+  });
+
+  it("does not match functions by fuzzy subsequence on the containing file path", () => {
+    const text = "@hmvw";
+    const selectionStart = text.length;
+    const textareaRef = createRef<HTMLTextAreaElement>();
+    textareaRef.current = {
+      focus: vi.fn(),
+      setSelectionRange: vi.fn(),
+    } as unknown as HTMLTextAreaElement;
+
+    const { result } = renderHook(() =>
+      useComposerAutocompleteState({
+        text,
+        selectionStart,
+        disabled: false,
+        appsEnabled: true,
+        skills: [],
+        apps: [],
+        prompts: [],
+        files: ["src/views/HomeView.tsx"],
+        callables: [
+          {
+            path: "src/views/HomeView.tsx",
+            symbol: "renderPanel",
+            kind: "function",
+            language: "typescript",
+          },
+          {
+            path: "src/views/HomeView.tsx",
+            symbol: "bindKeyboardShortcuts",
+            kind: "function",
+            language: "typescript",
+          },
+        ],
+        textareaRef,
+        setText: vi.fn(),
+        setSelectionStart: vi.fn(),
+      }),
+    );
+
+    expect(result.current.autocompleteMatches).toEqual([
+      expect.objectContaining({
+        group: "Files",
+        label: "src/views/HomeView.tsx",
+      }),
+    ]);
+  });
+
+  it("caps @ results to 20 functions and 50 files separately", () => {
+    const text = "@src";
+    const selectionStart = text.length;
+    const textareaRef = createRef<HTMLTextAreaElement>();
+    textareaRef.current = {
+      focus: vi.fn(),
+      setSelectionRange: vi.fn(),
+    } as unknown as HTMLTextAreaElement;
+
+    const files = Array.from({ length: 80 }, (_, index) => `src/features/file-${index}.ts`);
+    const callables: WorkspaceCallableSymbol[] = Array.from({ length: 30 }, (_, index) => ({
+      path: `src/features/file-${index}.ts`,
+      symbol: `useFeature${index}`,
+      kind: "hook",
+      language: "typescript",
+    }));
+
+    const { result } = renderHook(() =>
+      useComposerAutocompleteState({
+        text,
+        selectionStart,
+        disabled: false,
+        appsEnabled: true,
+        skills: [],
+        apps: [],
+        prompts: [],
+        files,
+        callables,
+        textareaRef,
+        setText: vi.fn(),
+        setSelectionStart: vi.fn(),
+      }),
+    );
+
+    expect(result.current.autocompleteMatches).toHaveLength(70);
+    expect(
+      result.current.autocompleteMatches.filter((item) => item.group === "Functions"),
+    ).toHaveLength(20);
+    expect(
+      result.current.autocompleteMatches.filter((item) => item.group === "Files"),
+    ).toHaveLength(50);
+  });
+
+  it("caps empty @ queries to 50 file results", () => {
+    const text = "@";
+    const selectionStart = text.length;
+    const textareaRef = createRef<HTMLTextAreaElement>();
+    textareaRef.current = {
+      focus: vi.fn(),
+      setSelectionRange: vi.fn(),
+    } as unknown as HTMLTextAreaElement;
+
+    const files = Array.from({ length: 80 }, (_, index) => `src/features/file-${index}.ts`);
+
+    const { result } = renderHook(() =>
+      useComposerAutocompleteState({
+        text,
+        selectionStart,
+        disabled: false,
+        appsEnabled: true,
+        skills: [],
+        apps: [],
+        prompts: [],
+        files,
+        callables: [],
+        textareaRef,
+        setText: vi.fn(),
+        setSelectionStart: vi.fn(),
+      }),
+    );
+
+    expect(result.current.autocompleteMatches).toHaveLength(50);
+    expect(result.current.autocompleteMatches.every((item) => item.group === "Files")).toBe(
+      true,
+    );
   });
 });

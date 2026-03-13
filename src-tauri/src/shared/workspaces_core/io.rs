@@ -186,13 +186,8 @@ pub(crate) async fn open_workspace_in_core(
         if trimmed.is_empty() {
             return Err("Missing app or command".to_string());
         }
-        let launch_args = build_launch_args(
-            &path,
-            &args,
-            line,
-            column,
-            command_launch_strategy(trimmed),
-        );
+        let launch_args =
+            build_launch_args(&path, &args, line, column, command_launch_strategy(trimmed));
 
         #[cfg(target_os = "windows")]
         let mut cmd = {

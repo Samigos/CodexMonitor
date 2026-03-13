@@ -488,14 +488,7 @@ pub(crate) async fn start_review(
         .await;
     }
 
-    codex_core::start_review_core(
-        &state.sessions,
-        workspace_id,
-        thread_id,
-        target,
-        delivery,
-    )
-    .await
+    codex_core::start_review_core(&state.sessions, workspace_id, thread_id, target, delivery).await
 }
 
 #[tauri::command]

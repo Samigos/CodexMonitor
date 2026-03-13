@@ -7,8 +7,16 @@ if [ "${1:-}" = "--strict" ]; then
 fi
 
 missing=""
+append_missing() {
+  if [ -z "$missing" ]; then
+    missing="$1"
+  else
+    missing="$missing, $1"
+  fi
+}
+
 if ! command -v cmake >/dev/null 2>&1; then
-  missing="cmake"
+  append_missing "cmake"
 fi
 
 if [ -z "$missing" ]; then
