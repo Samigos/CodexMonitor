@@ -54,6 +54,7 @@ type UseMainAppLayoutSurfacesArgs = {
   activeWorkspaceId: string | null;
   activeThreadId: string | null;
   activeItems: LayoutNodesOptions["primary"]["messagesProps"]["items"];
+  activeTurnDiff: LayoutNodesOptions["primary"]["messagesProps"]["turnDiff"];
   userInputRequests: SidebarProps["userInputRequests"];
   approvals: LayoutNodesOptions["primary"]["approvalToastsProps"]["approvals"];
   activeRateLimits: SidebarProps["accountRateLimits"];
@@ -250,6 +251,7 @@ export function useMainAppLayoutSurfaces({
   activeWorkspaceId,
   activeThreadId,
   activeItems,
+  activeTurnDiff,
   userInputRequests,
   approvals,
   activeRateLimits,
@@ -450,6 +452,7 @@ export function useMainAppLayoutSurfaces({
         threadId: activeThreadId ?? null,
         workspaceId: activeWorkspace?.id ?? null,
         workspacePath: activeWorkspace?.path ?? null,
+        turnDiff: activeTurnDiff ?? null,
         openTargets: appSettings.openAppTargets,
         selectedOpenAppId: appSettings.selectedOpenAppId,
         codeBlockCopyUseModifier: appSettings.composerCodeBlockCopyUseModifier,

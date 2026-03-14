@@ -21,6 +21,7 @@ import { RequestUserInputMessage } from "../../app/components/RequestUserInputMe
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
 import {
   SCROLL_THRESHOLD_PX,
+  buildLatestFileChangeSummary,
   buildToolGroups,
   computePlanFollowupState,
   formatCount,
@@ -30,6 +31,7 @@ import {
 import {
   DiffRow,
   ExploreRow,
+  FileChangeSummaryRow,
   MessageRow,
   ReasoningRow,
   ReviewRow,
@@ -49,6 +51,7 @@ type MessagesProps = {
   showPollingFetchStatus?: boolean;
   pollingIntervalMs?: number;
   workspacePath?: string | null;
+  turnDiff?: string | null;
   openTargets: OpenAppTarget[];
   selectedOpenAppId: string;
   codeBlockCopyUseModifier?: boolean;
@@ -87,6 +90,7 @@ export const Messages = memo(function Messages({
   showPollingFetchStatus = false,
   pollingIntervalMs = 12000,
   workspacePath = null,
+  turnDiff = null,
   openTargets,
   selectedOpenAppId,
   codeBlockCopyUseModifier = false,
@@ -311,6 +315,10 @@ export const Messages = memo(function Messages({
   }, [scrollKey, isThinking, isNearBottom, threadId]);
 
   const groupedItems = useMemo(() => buildToolGroups(visibleItems), [visibleItems]);
+  const latestFileChangeSummary = useMemo(
+    () => buildLatestFileChangeSummary(visibleItems, turnDiff),
+    [turnDiff, visibleItems],
+  );
 
   const hasActiveUserInputRequest = activeUserInputRequestId !== null;
   const hasVisibleUserInputRequest = hasActiveUserInputRequest && Boolean(onUserInputSubmit);
@@ -516,6 +524,9 @@ export const Messages = memo(function Messages({
         }
         return renderItem(entry.item);
       })}
+      {latestFileChangeSummary && (
+        <FileChangeSummaryRow summary={latestFileChangeSummary} />
+      )}
       {planFollowupNode}
       {userInputNode}
       <WorkingIndicator

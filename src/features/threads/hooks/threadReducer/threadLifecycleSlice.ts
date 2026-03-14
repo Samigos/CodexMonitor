@@ -221,6 +221,12 @@ export function reduceThreadLifecycle(
           ...state.activeTurnIdByThread,
           [action.threadId]: action.turnId,
         },
+        turnDiffByThread: action.turnId
+          ? {
+              ...state.turnDiffByThread,
+              [action.threadId]: "",
+            }
+          : state.turnDiffByThread,
       };
     case "markReviewing": {
       const previous = state.threadStatusById[action.threadId];

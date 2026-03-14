@@ -27,11 +27,41 @@ export type ToolGroupItem = Extract<
   { kind: "tool" | "reasoning" | "explore" | "userInput" }
 >;
 
+type FileChangeToolItem = Extract<ConversationItem, { kind: "tool" }> & {
+  toolType: "fileChange";
+};
+
 export type ToolGroup = {
   id: string;
   items: ToolGroupItem[];
   toolCount: number;
   messageCount: number;
+};
+
+export type FileChangeSummaryEdit = {
+  id: string;
+  label: string;
+  diff: string;
+  additions: number;
+  deletions: number;
+};
+
+export type FileChangeSummaryFile = {
+  id: string;
+  path: string;
+  status: "A" | "D" | "M" | "R";
+  edits: FileChangeSummaryEdit[];
+};
+
+export type FileChangeSummary = {
+  id: string;
+  files: FileChangeSummaryFile[];
+  counts: {
+    added: number;
+    deleted: number;
+    modified: number;
+    renamed: number;
+  };
 };
 
 export type MessageListEntry =
@@ -228,6 +258,361 @@ function isToolGroupItem(item: ConversationItem): item is ToolGroupItem {
   );
 }
 
+function isFileChangeToolItem(
+  item: ConversationItem,
+): item is FileChangeToolItem {
+  return item.kind === "tool" && item.toolType === "fileChange";
+}
+
+function normalizeChangePath(rawPath: string) {
+  let normalized = rawPath.trim().replace(/\\/g, "/");
+  normalized = normalized.replace(/^\.\/+/, "");
+  normalized = normalized.replace(/^(?:a|b)\//, "");
+  normalized = normalized.replace(/\/+/g, "/");
+  return normalized;
+}
+
+function extractPathFromDiff(diff: string): string | null {
+  if (!diff.trim()) {
+    return null;
+  }
+
+  const lines = diff.split("\n");
+
+  for (const line of lines) {
+    const match = /^diff --git a\/(.+?) b\/(.+)$/.exec(line.trim());
+    if (match?.[2]) {
+      return normalizeChangePath(match[2]);
+    }
+  }
+
+  for (const line of lines) {
+    const match = /^\+\+\+ (?:b\/)?(.+)$/.exec(line.trim());
+    if (!match?.[1]) {
+      continue;
+    }
+    const path = normalizeChangePath(match[1]);
+    if (path && path !== "/dev/null") {
+      return path;
+    }
+  }
+
+  return null;
+}
+
+function mapChangeKindToStatus(kind?: string): FileChangeSummaryFile["status"] {
+  const normalized = (kind ?? "").trim().toLowerCase();
+  if (normalized === "add" || normalized === "added" || normalized === "create") {
+    return "A";
+  }
+  if (normalized === "delete" || normalized === "deleted" || normalized === "remove") {
+    return "D";
+  }
+  if (normalized === "rename" || normalized === "renamed") {
+    return "R";
+  }
+  return "M";
+}
+
+function countDiffStats(diff: string) {
+  let additions = 0;
+  let deletions = 0;
+
+  for (const line of diff.split("\n")) {
+    if (!line) {
+      continue;
+    }
+    if (
+      line.startsWith("+++")
+      || line.startsWith("---")
+      || line.startsWith("diff --git")
+      || line.startsWith("@@")
+      || line.startsWith("index ")
+      || line.startsWith("\\ No newline")
+    ) {
+      continue;
+    }
+    if (line.startsWith("+")) {
+      additions += 1;
+      continue;
+    }
+    if (line.startsWith("-")) {
+      deletions += 1;
+    }
+  }
+
+  return { additions, deletions };
+}
+
+function incrementFileChangeCount(
+  counts: FileChangeSummary["counts"],
+  status: FileChangeSummaryFile["status"],
+) {
+  if (status === "A") {
+    counts.added += 1;
+  } else if (status === "D") {
+    counts.deleted += 1;
+  } else if (status === "R") {
+    counts.renamed += 1;
+  } else {
+    counts.modified += 1;
+  }
+}
+
+function decrementFileChangeCount(
+  counts: FileChangeSummary["counts"],
+  status: FileChangeSummaryFile["status"],
+) {
+  if (status === "A") {
+    counts.added = Math.max(0, counts.added - 1);
+  } else if (status === "D") {
+    counts.deleted = Math.max(0, counts.deleted - 1);
+  } else if (status === "R") {
+    counts.renamed = Math.max(0, counts.renamed - 1);
+  } else {
+    counts.modified = Math.max(0, counts.modified - 1);
+  }
+}
+
+function buildFileChangeSummary(
+  items: FileChangeToolItem[],
+): FileChangeSummary | null {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const filesByPath = new Map<string, FileChangeSummaryFile>();
+  const editCountByPath = new Map<string, number>();
+  const counts = {
+    added: 0,
+    deleted: 0,
+    modified: 0,
+    renamed: 0,
+  };
+
+  for (const item of items) {
+    const changes = Array.isArray(item.changes) ? item.changes : [];
+    for (const [changeIndex, change] of changes.entries()) {
+      const pathFromChange = normalizeChangePath(change.path ?? "");
+      const diff = change.diff ?? "";
+      const path = extractPathFromDiff(diff) ?? pathFromChange;
+      if (!path) {
+        continue;
+      }
+      const status = mapChangeKindToStatus(change.kind);
+      const existing = filesByPath.get(path);
+      if (!existing) {
+        filesByPath.set(path, {
+          id: `file-change-${path}`,
+          path,
+          status,
+          edits: [],
+        });
+        incrementFileChangeCount(counts, status);
+      } else if (existing.status !== status) {
+        decrementFileChangeCount(counts, existing.status);
+        existing.status = status;
+        incrementFileChangeCount(counts, status);
+      }
+
+      if (!diff.trim()) {
+        continue;
+      }
+
+      const nextCount = (editCountByPath.get(path) ?? 0) + 1;
+      editCountByPath.set(path, nextCount);
+      const file = filesByPath.get(path);
+      if (!file) {
+        continue;
+      }
+      const { additions, deletions } = countDiffStats(diff);
+      file.edits.push({
+        id: `${path}@@${item.id}@@${changeIndex}`,
+        label: `Edit ${nextCount}`,
+        diff,
+        additions,
+        deletions,
+      });
+    }
+  }
+
+  const files = Array.from(filesByPath.values());
+  if (files.length === 0) {
+    return null;
+  }
+
+  return {
+    id: `file-change-summary-${items[0]?.id ?? "thread"}`,
+    files,
+    counts,
+  };
+}
+
+function splitTurnDiffIntoBlocks(diff: string) {
+  if (!diff.trim()) {
+    return [];
+  }
+
+  const lines = diff.split("\n");
+  const blocks: string[] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("diff --git ")) {
+      if (current.length > 0) {
+        blocks.push(current.join("\n"));
+      }
+      current = [line];
+      continue;
+    }
+    if (current.length > 0) {
+      current.push(line);
+    }
+  }
+
+  if (current.length > 0) {
+    blocks.push(current.join("\n"));
+  }
+
+  if (blocks.length > 0) {
+    return blocks;
+  }
+
+  return [diff];
+}
+
+function statusFromTurnDiffBlock(diff: string): FileChangeSummaryFile["status"] {
+  const lines = diff.split("\n");
+  if (
+    lines.some((line) => line.startsWith("new file mode"))
+    || lines.some((line) => line.startsWith("--- /dev/null"))
+  ) {
+    return "A";
+  }
+  if (
+    lines.some((line) => line.startsWith("deleted file mode"))
+    || lines.some((line) => line.startsWith("+++ /dev/null"))
+  ) {
+    return "D";
+  }
+  if (
+    lines.some((line) => line.startsWith("rename from "))
+    || lines.some((line) => line.startsWith("rename to "))
+  ) {
+    return "R";
+  }
+  return "M";
+}
+
+export function buildFileChangeSummaryFromTurnDiff(
+  diff: string | null | undefined,
+): FileChangeSummary | null {
+  if (!diff?.trim()) {
+    return null;
+  }
+
+  const filesByPath = new Map<string, FileChangeSummaryFile>();
+  const editCountByPath = new Map<string, number>();
+  const counts = {
+    added: 0,
+    deleted: 0,
+    modified: 0,
+    renamed: 0,
+  };
+
+  for (const block of splitTurnDiffIntoBlocks(diff)) {
+    const path = extractPathFromDiff(block);
+    if (!path) {
+      continue;
+    }
+    const status = statusFromTurnDiffBlock(block);
+    const existing = filesByPath.get(path);
+    if (!existing) {
+      filesByPath.set(path, {
+        id: `turn-diff-${path}`,
+        path,
+        status,
+        edits: [],
+      });
+      incrementFileChangeCount(counts, status);
+    } else if (existing.status !== status) {
+      decrementFileChangeCount(counts, existing.status);
+      existing.status = status;
+      incrementFileChangeCount(counts, status);
+    }
+
+    const nextCount = (editCountByPath.get(path) ?? 0) + 1;
+    editCountByPath.set(path, nextCount);
+    const file = filesByPath.get(path);
+    if (!file) {
+      continue;
+    }
+    const { additions, deletions } = countDiffStats(block);
+    file.edits.push({
+      id: `${path}@@turn-diff@@${nextCount}`,
+      label: `Edit ${nextCount}`,
+      diff: block,
+      additions,
+      deletions,
+    });
+  }
+
+  const files = Array.from(filesByPath.values());
+  if (files.length === 0) {
+    return null;
+  }
+
+  return {
+    id: "file-change-summary-turn-diff",
+    files,
+    counts,
+  };
+}
+
+export function buildLatestFileChangeSummary(
+  items: ConversationItem[],
+  turnDiff?: string | null,
+): FileChangeSummary | null {
+  const turnDiffSummary = buildFileChangeSummaryFromTurnDiff(turnDiff);
+  if (turnDiffSummary) {
+    return turnDiffSummary;
+  }
+
+  let latestSummary: FileChangeSummary | null = null;
+  let buffer: ToolGroupItem[] = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (isToolGroupItem(item)) {
+      buffer.push(item);
+      continue;
+    }
+
+    if (item.kind === "message" && item.role === "assistant") {
+      const trailingItems: ToolGroupItem[] = [];
+      let nextIndex = index + 1;
+      while (nextIndex < items.length && isToolGroupItem(items[nextIndex]!)) {
+        trailingItems.push(items[nextIndex] as ToolGroupItem);
+        nextIndex += 1;
+      }
+
+      const fileChangeItems = [...buffer, ...trailingItems].filter(isFileChangeToolItem);
+      const summary = buildFileChangeSummary(fileChangeItems);
+      if (summary) {
+        latestSummary = summary;
+      }
+
+      buffer = [];
+      index = nextIndex - 1;
+      continue;
+    }
+
+    buffer = [];
+  }
+
+  return latestSummary;
+}
+
 function mergeExploreItems(
   items: Extract<ConversationItem, { kind: "explore" }>[],
 ): Extract<ConversationItem, { kind: "explore" }> {
@@ -275,11 +660,11 @@ export function buildToolGroups(items: ConversationItem[]): MessageListEntry[] {
   const entries: MessageListEntry[] = [];
   let buffer: ToolGroupItem[] = [];
 
-  const flush = () => {
-    if (buffer.length === 0) {
-      return;
+  const buildToolEntries = (items: ToolGroupItem[]) => {
+    if (items.length === 0) {
+      return [];
     }
-    const normalizedBuffer = mergeConsecutiveExploreRuns(buffer);
+    const normalizedBuffer = mergeConsecutiveExploreRuns(items);
     const toolCount = normalizedBuffer.reduce((total, item) => {
       if (item.kind === "tool") {
         return total + 1;
@@ -292,10 +677,11 @@ export function buildToolGroups(items: ConversationItem[]): MessageListEntry[] {
     const messageCount = normalizedBuffer.filter(
       (item) => item.kind !== "tool" && item.kind !== "explore",
     ).length;
+    const nextEntries: MessageListEntry[] = [];
     if (toolCount === 0 || normalizedBuffer.length === 1) {
-      normalizedBuffer.forEach((item) => entries.push({ kind: "item", item }));
+      normalizedBuffer.forEach((item) => nextEntries.push({ kind: "item", item }));
     } else {
-      entries.push({
+      nextEntries.push({
         kind: "toolGroup",
         group: {
           id: normalizedBuffer[0].id,
@@ -305,6 +691,14 @@ export function buildToolGroups(items: ConversationItem[]): MessageListEntry[] {
         },
       });
     }
+    return nextEntries;
+  };
+
+  const flush = () => {
+    if (buffer.length === 0) {
+      return;
+    }
+    entries.push(...buildToolEntries(buffer));
     buffer = [];
   };
 

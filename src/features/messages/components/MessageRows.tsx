@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import Brain from "lucide-react/dist/esm/icons/brain";
@@ -28,6 +28,8 @@ import {
   normalizeMessageImageSrc,
   toolNameFromTitle,
   toolStatusTone,
+  type FileChangeSummary,
+  type FileChangeSummaryFile,
   type MessageImage,
   type ParsedReasoning,
   type StatusTone,
@@ -74,6 +76,10 @@ type ReviewRowProps = MarkdownFileLinkProps & {
 
 type DiffRowProps = {
   item: Extract<ConversationItem, { kind: "diff" }>;
+};
+
+type FileChangeSummaryRowProps = {
+  summary: FileChangeSummary;
 };
 
 type UserInputRowProps = {
@@ -294,6 +300,58 @@ function buildPlanExportFileName(itemId: string) {
     return "plan.md";
   }
   return normalized.startsWith("plan-") ? `${normalized}.md` : `plan-${normalized}.md`;
+}
+
+function splitChangePath(path: string) {
+  const normalized = path.replace(/\\/g, "/");
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length <= 1) {
+    return { name: normalized, dir: "" };
+  }
+  return {
+    name: parts[parts.length - 1] ?? normalized,
+    dir: parts.slice(0, -1).join("/"),
+  };
+}
+
+function changeStatusLabel(status: FileChangeSummaryFile["status"]) {
+  if (status === "A") {
+    return "Created";
+  }
+  if (status === "D") {
+    return "Deleted";
+  }
+  if (status === "R") {
+    return "Renamed";
+  }
+  return "Updated";
+}
+
+function totalFileDiffStats(file: FileChangeSummaryFile) {
+  return file.edits.reduce(
+    (totals, edit) => ({
+      additions: totals.additions + edit.additions,
+      deletions: totals.deletions + edit.deletions,
+    }),
+    { additions: 0, deletions: 0 },
+  );
+}
+
+function buildFileChangeSummaryText(summary: FileChangeSummary) {
+  const parts: string[] = [];
+  if (summary.counts.added > 0) {
+    parts.push(`${summary.counts.added} created`);
+  }
+  if (summary.counts.modified > 0) {
+    parts.push(`${summary.counts.modified} updated`);
+  }
+  if (summary.counts.deleted > 0) {
+    parts.push(`${summary.counts.deleted} deleted`);
+  }
+  if (summary.counts.renamed > 0) {
+    parts.push(`${summary.counts.renamed} renamed`);
+  }
+  return parts.join(" • ");
 }
 
 export const WorkingIndicator = memo(function WorkingIndicator({
@@ -594,6 +652,113 @@ export const DiffRow = memo(function DiffRow({ item }: DiffRowProps) {
       </div>
       <div className="diff-viewer-output">
         <PierreDiffBlock diff={item.diff} displayPath={item.title} />
+      </div>
+    </div>
+  );
+});
+
+export const FileChangeSummaryRow = memo(function FileChangeSummaryRow({
+  summary,
+}: FileChangeSummaryRowProps) {
+  const [expandedFileIds, setExpandedFileIds] = useState<Set<string>>(new Set());
+  const summaryText = buildFileChangeSummaryText(summary);
+
+  useEffect(() => {
+    setExpandedFileIds(new Set());
+  }, [summary.id]);
+
+  return (
+    <div className="message assistant">
+      <div className="bubble message-bubble file-change-message">
+        <div className="file-change-message-header">
+          <div className="file-change-message-heading">
+            <FileDiffIcon size={16} aria-hidden />
+            <div className="file-change-message-title-group">
+              <div className="file-change-message-title">Changed files</div>
+              <div className="file-change-message-subtitle">
+                {summary.files.length} {summary.files.length === 1 ? "file" : "files"}
+                {summaryText ? ` • ${summaryText}` : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="file-change-message-list" role="list">
+          {summary.files.map((file) => {
+            const { name, dir } = splitChangePath(file.path);
+            const isExpanded = expandedFileIds.has(file.id);
+            const totals = totalFileDiffStats(file);
+            const hasStats = totals.additions > 0 || totals.deletions > 0;
+            return (
+              <Fragment key={file.id}>
+                <button
+                  type="button"
+                  className={`file-change-message-row${isExpanded ? " is-selected" : ""}`}
+                  onClick={() =>
+                    setExpandedFileIds((current) => {
+                      const next = new Set(current);
+                      if (next.has(file.id)) {
+                        next.delete(file.id);
+                      } else {
+                        next.add(file.id);
+                      }
+                      return next;
+                    })
+                  }
+                  aria-expanded={isExpanded}
+                >
+                  <span
+                    className={`file-change-message-status file-change-message-status--${file.status.toLowerCase()}`}
+                    aria-label={changeStatusLabel(file.status)}
+                  >
+                    {file.status}
+                  </span>
+                  <span className="file-change-message-path">
+                    <span className="file-change-message-name">{name || basename(file.path)}</span>
+                    {dir && <span className="file-change-message-dir">{dir}</span>}
+                  </span>
+                  <span className="file-change-message-meta">
+                    {hasStats ? (
+                      <span
+                        className="file-change-message-counts"
+                        aria-label={`+${totals.additions} -${totals.deletions}`}
+                      >
+                        <span className="diff-add">+{totals.additions}</span>
+                        <span className="diff-sep">/</span>
+                        <span className="diff-del">-{totals.deletions}</span>
+                      </span>
+                    ) : (
+                      <span className="file-change-message-preview">
+                        {file.edits.length > 0 ? "View diff" : "No diff"}
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="file-change-message-diff">
+                    {file.edits.length > 0 ? (
+                      file.edits.map((edit) => (
+                        <div key={edit.id} className="file-change-message-edit">
+                          {file.edits.length > 1 && (
+                            <div className="file-change-message-edit-label">
+                              {edit.label}
+                            </div>
+                          )}
+                          <div className="diff-viewer-output">
+                            <PierreDiffBlock diff={edit.diff} displayPath={file.path} />
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="file-change-message-empty">
+                        Diff unavailable for {file.path}.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

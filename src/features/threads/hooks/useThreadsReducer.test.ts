@@ -524,6 +524,23 @@ describe("threadReducer", () => {
     );
   });
 
+  it("clears the previous turn diff when a new turn starts", () => {
+    const base: ThreadState = {
+      ...initialState,
+      turnDiffByThread: {
+        "thread-1": "diff --git a/file.ts b/file.ts",
+      },
+    };
+
+    const next = threadReducer(base, {
+      type: "setActiveTurnId",
+      threadId: "thread-1",
+      turnId: "turn-2",
+    });
+
+    expect(next.turnDiffByThread["thread-1"]).toBe("");
+  });
+
   it("clears turn diff state when a thread is removed", () => {
     const base: ThreadState = {
       ...initialState,

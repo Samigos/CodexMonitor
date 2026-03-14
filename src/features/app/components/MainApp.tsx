@@ -500,6 +500,7 @@ export default function MainApp() {
     threadListPagingByWorkspace,
     threadListCursorByWorkspace,
     activeTurnIdByThread,
+    turnDiffByThread,
     tokenUsageByThread,
     rateLimitsByWorkspace,
     accountByWorkspace,
@@ -1180,6 +1181,9 @@ export default function MainApp() {
   const activePlan = activeThreadId
     ? planByThread[activeThreadId] ?? null
     : null;
+  const activeTurnDiff = activeThreadId
+    ? turnDiffByThread[activeThreadId] ?? null
+    : null;
   const hasActivePlan = Boolean(
     activePlan && (activePlan.steps.length > 0 || activePlan.explanation)
   );
@@ -1703,6 +1707,7 @@ export default function MainApp() {
     activeWorkspaceId,
     activeThreadId,
     activeItems,
+    activeTurnDiff,
     userInputRequests,
     approvals,
     activeRateLimits,

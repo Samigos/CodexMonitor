@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useCallback, useState } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationItem } from "../../../types";
 import { Messages } from "./Messages";
@@ -34,6 +34,21 @@ vi.mock("@services/tauri", async () => {
     exportMarkdownFile: exportMarkdownFileMock,
   };
 });
+
+vi.mock("../../git/components/PierreDiffBlock", () => ({
+  PierreDiffBlock: ({
+    diff,
+    displayPath,
+  }: {
+    diff: string;
+    displayPath: string;
+  }) => (
+    <div data-testid="mock-pierre-diff">
+      <div>{displayPath}</div>
+      <pre>{diff}</pre>
+    </div>
+  ),
+}));
 
 describe("Messages", () => {
   beforeAll(() => {
@@ -238,6 +253,169 @@ describe("Messages", () => {
 
     fireEvent.click(screen.getByText("Open review thread"));
     expect(onOpenThreadLink).toHaveBeenCalledWith("thread-review-1", "ws-1");
+  });
+
+  it("renders file changes as a summary message after the assistant response", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "user-change",
+        kind: "message",
+        role: "user",
+        text: "Update the file",
+      },
+      {
+        id: "change-1",
+        kind: "tool",
+        toolType: "fileChange",
+        title: "File changes",
+        detail: "M src/main.ts",
+        status: "completed",
+        changes: [
+          {
+            path: "src/main.ts",
+            kind: "modify",
+            diff:
+              "diff --git a/src/main.ts b/src/main.ts\n--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1 +1 @@\n-old value\n+new value",
+          },
+        ],
+      },
+      {
+        id: "assistant-change",
+        kind: "message",
+        role: "assistant",
+        text: "Updated the file.",
+      },
+    ];
+
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    expect(screen.getByText("Updated the file.")).toBeTruthy();
+    expect(screen.getByText("Changed files")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /main\.ts/i })).toHaveLength(2);
+    expect(screen.queryByText("new value")).toBeNull();
+
+    const summaryMessage = screen.getByText("Changed files").closest(".file-change-message");
+    if (!(summaryMessage instanceof HTMLElement)) {
+      throw new Error("Expected file change summary message");
+    }
+
+    fireEvent.click(within(summaryMessage).getByRole("button", { name: /main\.ts/i }));
+
+    expect(screen.getByTestId("mock-pierre-diff").textContent ?? "").toContain(
+      "+new value",
+    );
+  });
+
+  it("falls back to turn-level diffs when no fileChange items are present", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "user-change",
+        kind: "message",
+        role: "user",
+        text: "Update the file",
+      },
+      {
+        id: "assistant-change",
+        kind: "message",
+        role: "assistant",
+        text: "Updated the file.",
+      },
+    ];
+
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        turnDiff={
+          "diff --git a/src/fallback.ts b/src/fallback.ts\n--- a/src/fallback.ts\n+++ b/src/fallback.ts\n@@ -1 +1 @@\n-old fallback\n+new fallback"
+        }
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    expect(screen.getByText("Changed files")).toBeTruthy();
+    const summaryMessage = screen.getByText("Changed files").closest(".file-change-message");
+    if (!(summaryMessage instanceof HTMLElement)) {
+      throw new Error("Expected file change summary message");
+    }
+    fireEvent.click(within(summaryMessage).getByRole("button", { name: /fallback\.ts/i }));
+    expect(screen.getByTestId("mock-pierre-diff").textContent ?? "").toContain(
+      "+new fallback",
+    );
+  });
+
+  it("keeps multiple file diffs expanded at the same time", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "user-change",
+        kind: "message",
+        role: "user",
+        text: "Update the files",
+      },
+      {
+        id: "change-1",
+        kind: "tool",
+        toolType: "fileChange",
+        title: "File changes",
+        detail: "M src/a.ts, M src/b.ts",
+        status: "completed",
+        changes: [
+          {
+            path: "src/a.ts",
+            kind: "modify",
+            diff:
+              "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-old a\n+new a",
+          },
+          {
+            path: "src/b.ts",
+            kind: "modify",
+            diff:
+              "diff --git a/src/b.ts b/src/b.ts\n--- a/src/b.ts\n+++ b/src/b.ts\n@@ -1 +1 @@\n-old b\n+new b",
+          },
+        ],
+      },
+      {
+        id: "assistant-change",
+        kind: "message",
+        role: "assistant",
+        text: "Updated both files.",
+      },
+    ];
+
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    const summaryMessage = screen.getByText("Changed files").closest(".file-change-message");
+    if (!(summaryMessage instanceof HTMLElement)) {
+      throw new Error("Expected file change summary message");
+    }
+
+    fireEvent.click(within(summaryMessage).getByRole("button", { name: /a\.ts/i }));
+    fireEvent.click(within(summaryMessage).getByRole("button", { name: /b\.ts/i }));
+
+    expect(screen.getByText(/\+new a/)).toBeTruthy();
+    expect(screen.getByText(/\+new b/)).toBeTruthy();
+    expect(screen.getAllByTestId("mock-pierre-diff")).toHaveLength(2);
   });
 
   it("renders file references as compact links and opens them", () => {
